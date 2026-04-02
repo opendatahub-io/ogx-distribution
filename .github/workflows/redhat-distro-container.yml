@@ -63,8 +63,8 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
-      VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3-0.6B
       VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
+      VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
@@ -222,7 +222,7 @@ jobs:
         id: vllm-inference
         uses: ./.github/actions/setup-vllm
         env:
-          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english
+          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
           VLLM_MODE: inference
 
       - name: Setup vLLM embedding container
@@ -230,7 +230,7 @@ jobs:
         id: vllm-embedding
         uses: ./.github/actions/setup-vllm
         env:
-          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english
+          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
           VLLM_MODE: embedding
 
       - name: Setup PostgreSQL container
