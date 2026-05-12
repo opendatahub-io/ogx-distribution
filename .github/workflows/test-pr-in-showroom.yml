@@ -1,6 +1,9 @@
 name: Test PR in Showroom
 
 on:
+  push:
+    branches:
+      - ntsh
   schedule:
     - cron: '0 8 * * *'  # daily at 08:00 UTC
   workflow_dispatch:
