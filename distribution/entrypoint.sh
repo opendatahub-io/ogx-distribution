@@ -21,4 +21,5 @@ if [ -n "$OTEL_SERVICE_NAME" ]; then
     llama stack run "$CONFIG" "$@"
 fi
 
+echo "HI o/, I'm running in RHOAI on openshift :-) "
 exec llama stack run "$CONFIG" "$@"
