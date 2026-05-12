@@ -60,6 +60,7 @@ function start_and_wait_for_llama_stack_container {
   docker_args+=(--name llama-stack "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
 
   # Start llama stack
+  echo docker run "${docker_args[@]}"
   docker run "${docker_args[@]}"
   echo "Started Llama Stack container..."
 
