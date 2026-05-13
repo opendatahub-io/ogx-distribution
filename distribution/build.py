@@ -166,7 +166,7 @@ def check_ogx_version():
     """Check if the ogx version in BASE_REQUIREMENTS matches the installed version."""
     try:
         result = subprocess.run(
-            ["ogx", "--version"],
+            ["ogx", "stack", "--version"],
             capture_output=True,
             text=True,
             check=True,
