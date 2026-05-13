@@ -54,7 +54,6 @@ repos:
         pass_filenames: false
         require_serial: true
         always_run: true
-        files: ^distribution/.*$
         additional_dependencies:
           - uv>=0.9.0
           - ruamel.yaml>=0.18.0
