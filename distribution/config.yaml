@@ -159,9 +159,9 @@ providers:
   - provider_id: reference
     provider_type: inline::reference
     config:
-      kvstore:
-        namespace: batches
-        backend: kv_default
+      sqlstore:
+        table_name: batches
+        backend: sql_default
 storage:
   backends:
     kv_default:
@@ -194,6 +194,9 @@ storage:
     prompts:
       namespace: prompts
       backend: kv_default
+    connectors:
+      table_name: connectors
+      backend: sql_default
 registered_resources:
   models:
   - metadata:
