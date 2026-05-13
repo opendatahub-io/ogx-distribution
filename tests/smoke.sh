@@ -150,9 +150,10 @@ function test_postgres_tables_exist {
 function test_postgres_populated {
   echo "===> Verifying PostgreSQL database has been populated..."
 
-  # Check that chat_completions table has data (retry for up to 10 seconds)
+  # The inference_store uses async writes, so records may not appear immediately.
+  # Wait up to 30 seconds for the queue to flush.
   echo "Waiting for inference_store table to be populated..."
-  for i in {1..10}; do
+  for i in {1..30}; do
     inference_count=$(docker exec postgres psql -U ogx -d ogx -t -c "SELECT COUNT(*) FROM inference_store;" 2>/dev/null | tr -d ' ')
     if [ -n "$inference_count" ] && [ "$inference_count" -gt 0 ]; then
       echo "===> inference_store table has $inference_count record(s)"
@@ -162,7 +163,7 @@ function test_postgres_populated {
     sleep 1
   done
   if [ -z "$inference_count" ] || [ "$inference_count" -eq 0 ]; then
-    echo "===> PostgreSQL inference_store table is empty or doesn't exist after 10s :("
+    echo "===> PostgreSQL inference_store table is empty or doesn't exist after 30s :("
     echo "Tables in database:"
     docker exec postgres psql -U ogx -d ogx -c "\dt" || true
     echo "inference_store table contents:"
