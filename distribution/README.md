@@ -4,7 +4,7 @@
 
 This image contains the official Open Data Hub OGX distribution, with all the packages and configuration needed to run an OGX server in a containerized environment.
 
-The image is currently shipping with the Open Data Hub version of OGX version [1.0.0+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.0.0+rhaiv.0)
+The image is currently shipping with the Open Data Hub version of OGX version [1.0.1+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.0.1+rhaiv.0)
 
 You can see an overview of the APIs and Providers the image ships with in the table below.
 
