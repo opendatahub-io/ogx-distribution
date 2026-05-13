@@ -56,6 +56,6 @@ uv pip install \
 uv pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torchao>=0.12.0' torch torchvision
 uv pip install --no-deps sentence-transformers
 
-opentelemetry-bootstrap -a requirements | grep -v opentelemetry-instrumentation-botocore | uv pip install --requirement -
+opentelemetry-bootstrap -a requirements | uv pip install --requirement -
 
 uv pip install tiktoken==0.12.0
