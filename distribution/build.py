@@ -317,9 +317,12 @@ def get_dependencies():
             # Sort and deduplicate packages
             packages = sorted(set(packages))
 
-            # Add quotes to packages with > or < to prevent bash redirection
+            # Add quotes to packages with >, <, or [ to prevent bash
+            # redirection and glob interpretation (shellcheck SC2102).
             packages = [
-                f"'{package}'" if (">" in package or "<" in package) else package
+                f"'{package}'"
+                if (">" in package or "<" in package or "[" in package)
+                else package
                 for package in packages
             ]
 
