@@ -15,7 +15,8 @@ uv pip install --upgrade \
     'aiobotocore==2.16.1' \
     'ibm-cos-sdk-core==2.14.2' \
     'ibm-cos-sdk==2.14.2' \
-    'setuptools==80.10.2'
+    'setuptools==80.10.2' \
+    'milvus-lite==2.5.1'
 uv pip install \
     'fonttools>=4.60.2' \
     'google-genai>=1.69.0' \

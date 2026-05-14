@@ -100,6 +100,7 @@ PINNED_DEPENDENCIES = [
     "'ibm-cos-sdk-core==2.14.2'",
     "'ibm-cos-sdk==2.14.2'",
     "'setuptools==80.10.2'",
+    "'milvus-lite==2.5.1'",
 ]
 
 source_install_command_pypi_client = """uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@{ogx_version}#subdirectory=src/ogx_api'
