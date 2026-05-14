@@ -8,9 +8,9 @@ RUN pip install uv
 COPY --chmod=755 distribution/install-deps.sh /opt/app-root/install-deps.sh
 RUN /opt/app-root/install-deps.sh
 
-RUN uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@v1.0.0+rhaiv.0#subdirectory=src/ogx_api'
-RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/ogx.git@v1.0.0+rhaiv.0
-RUN uv pip install --no-cache --no-deps ogx-client==1.0.0
+RUN uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@v1.0.2+rhaiv.0#subdirectory=src/ogx_api'
+RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/ogx.git@v1.0.2+rhaiv.0
+RUN uv pip install --no-cache --no-deps ogx-client==1.0.2
 
 COPY --chmod=755 distribution/install-common.sh /opt/app-root/install-common.sh
 RUN /opt/app-root/install-common.sh
