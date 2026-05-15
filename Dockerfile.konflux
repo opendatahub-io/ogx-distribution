@@ -1,53 +1,49 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-ARG BASE_IMAGE
-ARG LLAMA_STACK_VERSION
-ARG WHEEL_RELEASE_AARCH64
-ARG WHEEL_RELEASE_X86_64
-ARG WHEEL_RELEASE_PPC64LE
-ARG WHEEL_RELEASE_PACKAGE
-ARG WHEEL_RELEASE_PROJECT_ID
+ARG OGX_VERSION
 
-LABEL com.redhat.component="llama-stack-cpu-rhel9-container" \
-      name="llama-stack/cpu-rhel9" \
-      description="Llama Stack ${LLAMA_STACK_VERSION} for CPU on RHEL 9" \
-      summary="Llama Stack for CPU" \
+LABEL com.redhat.component="ogx-cpu-rhel9-container" \
+      name="ogx/cpu-rhel9" \
+      description="OGX ${OGX_VERSION} for CPU on RHEL 9" \
+      summary="OGX for CPU" \
       maintainer="['managed-open-data-hub@redhat.com']" \
-      io.k8s.display-name="Llama Stack for CPU" \
-      io.k8s.description="Llama Stack ${LLAMA_STACK_VERSION} for CPU on RHEL 9" \
+      io.k8s.display-name="OGX for CPU" \
+      io.k8s.description="OGX ${OGX_VERSION} for CPU on RHEL 9" \
       io.openshift.expose-services="" \
       com.redhat.license_terms="https://www.redhat.com/en/about/eulas#RHAIIS" \
-      com.redhat.aiplatform.image="${BASE_IMAGE}" \
-      com.redhat.aiplatform.wheel_release="${WHEEL_RELEASE_AARCH64} ${WHEEL_RELEASE_X86_64} ${WHEEL_RELEASE_PPC64LE}"
+      com.redhat.aiplatform.image="${BASE_IMAGE}"
 
-RUN --mount=type=secret,id=rhel-ai-private-index-auth/BOT_PAT,target=/run/secrets/gitlab_pat,required=true,uid=${CNB_USER_ID},gid=${CNB_GROUP_ID} \
-    ${APP_ROOT}/lib/tools/install-wheel-release.sh
+COPY --chmod=755 distribution/install-deps.sh ${APP_ROOT}/install-deps.sh
+RUN ${APP_ROOT}/install-deps.sh
+
+COPY distribution/versions.env ${APP_ROOT}/versions.env
+# TODO: remove --extra-index-url once ogx packages are in the base image index
+RUN . ${APP_ROOT}/versions.env && \
+    uv pip install ogx==${OGX_VERSION} ogx-api==${OGX_VERSION} ogx-client==${OGX_CLIENT_VERSION}
 
 USER 0
 # install missing RPMs (online, requires subscription)
 # RUN ${APP_ROOT}/lib/tools/fromager-rpm-check.py --check-dnf -y --dnf-clean
-# switch from internal mirrors to public vendor repos
+# TODO: check if public-repos.sh is still needed
 RUN ${APP_ROOT}/lib/tools/public-repos.sh
 USER ${CNB_USER_ID}:${CNB_GROUP_ID}
 
 # scan for missing RPMs (offline), missing libraries / symbols, and selftest
 # AIPCC-3688: do not scan the container for missing libraries and symbols
 # re-add ${APP_ROOT}/lib/tools/scanlibs.py below once milvus-lite build is fixed
+# TODO: check if selftest.py is still needed
 RUN ${APP_ROOT}/lib/tools/fromager-rpm-check.py --check-rpmdb \
     && ${APP_ROOT}/lib/tools/selftest.py
 
-# LLama Stack configuration
-RUN mkdir -p ${HOME}/.llama ${HOME}/.cache
+# OGX configuration
+COPY --chmod=755 distribution/install-common.sh ${APP_ROOT}/install-common.sh
+RUN ${APP_ROOT}/install-common.sh
+ENV TIKTOKEN_CACHE_DIR="${HOME}/.cache/tiktoken"
 COPY distribution/config.yaml ${APP_ROOT}/config.yaml
 COPY --chmod=755 distribution/entrypoint.sh ${APP_ROOT}/entrypoint.sh
 
 # Download embedding model
 RUN hf download ibm-granite/granite-embedding-125m-english
-
-# Pre-cache tiktoken cl100k_base encoding to avoid runtime download
-# from openaipublic.blob.core.windows.net (used by vector_store chunking)
-ENV TIKTOKEN_CACHE_DIR="${HOME}/.cache/tiktoken"
-RUN python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 
 ENTRYPOINT [ "/opt/app-root/entrypoint.sh" ]
