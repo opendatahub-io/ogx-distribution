@@ -407,7 +407,7 @@ def generate_install_deps_script(dependencies):
         "",
         dependencies.rstrip(),
         "",
-        "opentelemetry-bootstrap -a requirements | uv pip install --requirement -",
+        "opentelemetry-bootstrap -a requirements | grep -v opentelemetry-instrumentation-botocore | uv pip install --requirement -",
         "",
         "uv pip install tiktoken==0.12.0",
     ]
