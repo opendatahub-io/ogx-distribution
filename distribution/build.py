@@ -351,7 +351,11 @@ def get_dependencies():
 
             # Build the command based on flags
             if extra_index_url or "--index-url" in flags:
-                # Torch dependencies with extra index URL
+                # PyTorch does not publish wheels for ppc64le
+                packages = [
+                    f"'{p.strip(chr(39))}; platform_machine != \"ppc64le\"'"
+                    for p in packages
+                ]
                 full_cmd = " ".join(cmd_parts + flags + packages)
                 torch_deps.append(full_cmd)
             elif "--no-deps" in flags:

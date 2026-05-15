@@ -51,7 +51,7 @@ uv pip install \
     tqdm \
     transformers \
     uvicorn
-uv pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torchao>=0.12.0' torch torchvision
+uv pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torchao>=0.12.0; platform_machine != "ppc64le"' 'torch; platform_machine != "ppc64le"' 'torchvision; platform_machine != "ppc64le"'
 uv pip install --no-deps sentence-transformers
 
 opentelemetry-bootstrap -a requirements | grep -v opentelemetry-instrumentation-botocore | uv pip install --requirement -
