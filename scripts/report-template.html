@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OGX Distribution — Responses API Tests</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #57606a; --border: #d0d7de;
+    --card: #f6f8fa; --hover: #eef1f5;
+    --pass: #1a7f37; --fail: #cf222e; --skip: #9a6700; --error: #bc4c00;
+    --chart-grid: rgba(0,0,0,0.06); --chart-text: #57606a;
+    --badge-fg: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--fg); padding: 2rem; max-width: 1200px; margin: 0 auto; line-height: 1.5; }
+  header { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .meta { color: var(--muted); font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .meta a { color: var(--pass); text-decoration: none; }
+  .meta a:hover { text-decoration: underline; }
+  .meta code { background: var(--card); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.8rem; border: 1px solid var(--border); }
+  .dot { color: var(--border); }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; color: var(--badge-fg); }
+  .badge-pass { background: var(--pass); }
+  .badge-fail { background: var(--fail); }
+
+  .section { margin-bottom: 2rem; }
+  h2 { font-size: 1rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
+  .chart-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead th { font-weight: 600; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--border); text-align: left; }
+  tbody td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hover); }
+  .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .pass { color: var(--pass); font-weight: 600; } .fail { color: var(--fail); font-weight: 600; }
+  .skip { color: var(--skip); } .err { color: var(--error); }
+  .zero { color: var(--muted); font-weight: 400; }
+  .model-name { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace; font-size: 0.8rem; }
+  a { color: var(--pass); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  #loading { color: var(--muted); padding: 3rem; text-align: center; font-size: 0.9rem; }
+  .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+  .summary-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
+  .summary-card .value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
+  .summary-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OGX Distribution — Responses API Tests</h1>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div id="summary-section" class="section" style="display:none">
+  <div class="summary-cards" id="summary"></div>
+</div>
+
+<div class="section">
+  <h2>Trend by Provider</h2>
+  <div class="chart-wrap">
+    <canvas id="provider-trend" height="80"></canvas>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Trend by Model</h2>
+  <div class="chart-wrap">
+    <canvas id="model-trend" height="80"></canvas>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Model Breakdown</h2>
+  <table><thead id="models-head"></thead><tbody id="models"></tbody></table>
+</div>
+
+<div class="section">
+  <h2>Run History</h2>
+  <table><thead id="history-head"></thead><tbody id="history"></tbody></table>
+</div>
+
+<div id="loading">Loading results...</div>
+
+<script>
+const CS = getComputedStyle(document.documentElement);
+const C = k => CS.getPropertyValue(k).trim();
+
+fetch('history.json').then(r => r.json()).then(data => {
+  document.getElementById('loading').remove();
+  if (!data.length) return;
+
+  const latest = data[data.length - 1];
+  const t = latest.totals;
+  const total = t.passed + t.failed + t.skipped + t.error;
+  const status = t.failed + t.error > 0 ? 'fail' : 'pass';
+
+  const providerCount = new Set(latest.models.map(m => m.provider)).size;
+  const modelCount = latest.models.length;
+  document.getElementById('meta').innerHTML = [
+    `OGX <b>${latest.ogx_version}</b>`,
+    `<code>${latest.branch}</code> @ <code>${latest.commit}</code>`,
+    `<a href="${latest.run_url}">Run #${latest.run_number}</a>`,
+    latest.date,
+    `<b>${providerCount}</b> providers, <b>${modelCount}</b> models`,
+    `<span class="badge badge-pass">${t.passed} passed</span>`,
+  ].join(' <span class="dot">&middot;</span> ');
+
+  // Summary cards
+  const sc = document.getElementById('summary-section');
+  sc.style.display = '';
+  document.getElementById('summary').innerHTML = [
+    ['--pass', t.passed, 'Passed'],
+    ['--fail', t.failed, 'Failed'],
+    ['--skip', t.skipped, 'Skipped'],
+    ['--error', t.error, 'Errors'],
+  ].map(([c, v, l]) => `<div class="summary-card"><div class="value" style="color:var(${c})">${v}</div><div class="label">${l}</div></div>`).join('') +
+  `<div class="summary-card"><div class="value">${total}</div><div class="label">Total</div></div>`;
+
+  // Shared chart helpers
+  const gridColor = C('--chart-grid');
+  const textColor = C('--chart-text');
+  const labels = data.map(d => d.date.split(' ')[0]);
+  const palette = ['#1a7f37', '#cf222e', '#0969da', '#9a6700', '#8250df', '#bc4c00', '#1b7c83', '#953800'];
+  function makeLine(label, color, passedArr) {
+    return { label, data: passedArr, borderColor: color, backgroundColor: color + '18', fill: false, tension: 0.3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2, spanGaps: true };
+  }
+
+  function sumBy(run, key, filterFn) {
+    return run.models.filter(filterFn).reduce((s, m) => s + m[key], 0);
+  }
+
+  const releaseLabels = data.map(d => d.ogx_version);
+  const tooltipCb = {
+    title: (items) => { const d = data[items[0].dataIndex]; return 'OGX ' + d.ogx_version + '  —  ' + d.date; },
+    label: (item) => `${item.dataset.label}: ${item.raw} passed`
+  };
+
+  // ── Trend by Provider ──
+  const providers = [...new Set(data.flatMap(d => d.models.map(m => m.provider)))];
+
+  // ── Trend by Model (linked to provider) ──
+  const allModelKeys = [...new Set(data.flatMap(d => d.models.map(m => m.provider + '/' + m.model)))];
+  const modelProviders = allModelKeys.map(k => k.split('/')[0]);
+  const modelDS = allModelKeys.map((key, i) => {
+    const prov = key.split('/')[0];
+    const model = key.split('/').slice(1).join('/');
+    const f = m => m.provider === prov && m.model === model;
+    return makeLine(model, palette[i % palette.length], data.map(d => sumBy(d, 'passed', f)));
+  });
+
+  const modelChart = new Chart(document.getElementById('model-trend'), {
+    type: 'line',
+    data: { labels: releaseLabels, datasets: modelDS },
+    options: {
+      responsive: true, interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textColor } },
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, title: { display: true, text: 'Tests passed', color: textColor } }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: textColor, usePointStyle: true, padding: 16 } },
+        tooltip: { callbacks: tooltipCb }
+      }
+    }
+  });
+
+  const provDS = providers.map(function(prov, i) {
+    var f = function(m) { return m.provider === prov; };
+    return makeLine(prov, palette[i % palette.length], data.map(function(d) { return sumBy(d, 'passed', f); }));
+  });
+
+  var provOpts = {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: textColor } },
+      y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor }, title: { display: true, text: 'Tests passed', color: textColor } }
+    },
+    plugins: {
+      tooltip: { callbacks: tooltipCb }
+    }
+  };
+  provOpts.plugins.legend = {
+    position: 'bottom',
+    labels: { color: textColor, usePointStyle: true, padding: 16 }
+  };
+  provOpts.plugins.legend.onClick = function(e, legendItem, legend) {
+    var idx = legendItem.datasetIndex;
+    var ci = legend.chart;
+    ci.setDatasetVisibility(idx, !ci.isDatasetVisible(idx));
+    ci.update();
+    var visible = new Set();
+    ci.data.datasets.forEach(function(ds, i) {
+      if (ci.isDatasetVisible(i)) visible.add(providers[i]);
+    });
+    modelChart.data.datasets.forEach(function(ds, i) {
+      modelChart.setDatasetVisibility(i, visible.has(modelProviders[i]));
+    });
+    modelChart.update();
+  };
+
+  var provChart = new Chart(document.getElementById('provider-trend'), {
+    type: 'line',
+    data: { labels: releaseLabels, datasets: provDS },
+    options: provOpts
+  });
+
+  // Model breakdown
+  const v = n => n > 0 ? n : '<span class="zero">0</span>';
+  document.getElementById('models-head').innerHTML =
+    '<tr><th>Provider</th><th>Model</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Skipped</th><th class="n">Errors</th><th class="n">Total</th></tr>';
+  document.getElementById('models').innerHTML = latest.models.map(m => {
+    const mt = m.passed + m.failed + m.skipped + m.error;
+    return `<tr><td>${m.provider}</td><td class="model-name">${m.model}</td><td class="n pass">${v(m.passed)}</td><td class="n fail">${v(m.failed)}</td><td class="n skip">${v(m.skipped)}</td><td class="n err">${v(m.error)}</td><td class="n">${mt}</td></tr>`;
+  }).join('');
+
+  // History
+  document.getElementById('history-head').innerHTML =
+    '<tr><th>Date</th><th>OGX</th><th>Branch</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Skipped</th><th class="n">Errors</th><th>Run</th></tr>';
+  document.getElementById('history').innerHTML = [...data].reverse().map(d =>
+    `<tr><td>${d.date}</td><td>${d.ogx_version}</td><td><code>${d.branch}</code></td><td class="n pass">${v(d.totals.passed)}</td><td class="n fail">${v(d.totals.failed)}</td><td class="n skip">${v(d.totals.skipped)}</td><td class="n err">${v(d.totals.error)}</td><td><a href="${d.run_url}">#${d.run_number}</a></td></tr>`
+  ).join('');
+});
+</script>
+</body>
+</html>

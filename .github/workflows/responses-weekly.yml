@@ -1,0 +1,200 @@
+name: "Responses: Weekly Report"
+
+on:
+  schedule:
+    - cron: '0 22 * * 0'  # Sunday 22:00 UTC
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  checks: write
+  pages: write
+
+jobs:
+  # ── OpenAI ──────────────────────────────────────────────────────
+  check-openai:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check OpenAI credentials
+        id: check
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::warning::OPENAI_API_KEY not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-openai:
+    needs: check-openai
+    if: needs.check-openai.outputs.enabled == 'true'
+    uses: ./.github/workflows/responses-run.yml
+    with:
+      provider_name: openai
+      models_json: '["openai/gpt-4o-mini","openai/gpt-4o","openai/o4-mini"]'
+      embedding_model: openai/text-embedding-3-small
+    secrets:
+      SERVER_EXTRA_ENV: |
+        OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+        TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+        EMBEDDING_MODEL=openai/text-embedding-3-small
+        EMBEDDING_PROVIDER=openai
+        EMBEDDING_PROVIDER_MODEL_ID=text-embedding-3-small
+
+  # ── Vertex AI ───────────────────────────────────────────────────
+  check-vertexai:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check Vertex AI credentials
+        id: check
+        env:
+          VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        run: |
+          if [ -z "$VERTEX_AI_PROJECT" ] || [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
+            echo "::warning::Vertex AI credentials not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-vertexai:
+    needs: check-vertexai
+    if: needs.check-vertexai.outputs.enabled == 'true'
+    uses: ./.github/workflows/responses-run.yml
+    with:
+      provider_name: vertexai
+      models_json: '["vertexai/publishers/google/models/gemini-2.0-flash"]'
+      embedding_model: vertexai/publishers/google/models/gemini-embedding-2
+      gcp_auth: true
+    secrets:
+      SERVER_EXTRA_ENV: |
+        VERTEX_AI_PROJECT=${{ secrets.VERTEX_AI_PROJECT }}
+        VERTEX_AI_LOCATION=us-central1
+        GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp-credentials
+        TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+        EMBEDDING_MODEL=vertexai/publishers/google/models/gemini-embedding-2
+        EMBEDDING_PROVIDER=vertexai
+        EMBEDDING_PROVIDER_MODEL_ID=publishers/google/models/gemini-embedding-2
+      GCP_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+  # ── vLLM MaaS ──────────────────────────────────────────────────
+  check-vllm-maas:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check MaaS credentials
+        id: check
+        env:
+          MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
+          MAAS_VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
+        run: |
+          if [ -z "$MAAS_VLLM_URL" ] || [ -z "$MAAS_VLLM_API_TOKEN" ]; then
+            echo "::warning::MaaS vLLM credentials not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-vllm-maas:
+    needs: check-vllm-maas
+    if: needs.check-vllm-maas.outputs.enabled == 'true'
+    uses: ./.github/workflows/responses-run.yml
+    with:
+      provider_name: vllm-maas
+      models_json: '["vllm-inference/llama-3-2-3b"]'
+      embedding_model: vllm-embedding/nomic-embed-text-v1-5
+    secrets:
+      SERVER_EXTRA_ENV: |
+        VLLM_URL=${{ secrets.MAAS_VLLM_URL }}
+        VLLM_API_TOKEN=${{ secrets.MAAS_VLLM_API_TOKEN }}
+        VLLM_EMBEDDING_URL=${{ secrets.MAAS_EMBEDDING_URL }}
+        VLLM_EMBEDDING_API_TOKEN=${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+        TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+        EMBEDDING_MODEL=vllm-embedding/nomic-embed-text-v1-5
+        EMBEDDING_PROVIDER=vllm-embedding
+        EMBEDDING_PROVIDER_MODEL_ID=nomic-embed-text-v1-5
+
+  # ── Test Report & GitHub Pages ───────────────────────────────────
+  report:
+    name: Publish Test Report
+    runs-on: ubuntu-24.04
+    if: always()
+    needs: [test-openai, test-vertexai, test-vllm-maas]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Determine deploy path
+        id: deploy
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "subfolder=" >> "$GITHUB_OUTPUT"
+          else
+            slug="${GITHUB_REF_NAME//\//-}"
+            echo "subfolder=preview/${slug}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download test results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: junit-results
+          pattern: responses-*
+          merge-multiple: true
+
+      - name: Get history from gh-pages
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Build report
+        env:
+          OGX_VERSION: ""
+        run: |
+          source distribution/versions.env
+          export OGX_VERSION="${OGX_VERSION}+${OGX_RHAI_VERSION}"
+
+          SUBFOLDER="${{ steps.deploy.outputs.subfolder }}"
+          PUBLISH_DIR="publish/${SUBFOLDER}"
+          mkdir -p "$PUBLISH_DIR"
+
+          HISTORY_FILE="gh-pages/${SUBFOLDER:+$SUBFOLDER/}history.json"
+
+          python3 scripts/junit_to_history.py \
+            junit-results \
+            "$HISTORY_FILE" \
+            "${PUBLISH_DIR}/history.json"
+
+          cp scripts/report-template.html "${PUBLISH_DIR}/index.html"
+
+      - name: Deploy to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: publish
+          publish_branch: gh-pages
+          keep_files: true
+
+      - name: Print report URL
+        if: always()
+        run: |
+          SUBFOLDER="${{ steps.deploy.outputs.subfolder }}"
+          BASE="https://opendatahub-io.github.io/ogx-distribution"
+          if [ -n "$SUBFOLDER" ]; then
+            echo "::notice::Preview: ${BASE}/${SUBFOLDER}/"
+          else
+            echo "::notice::Report: ${BASE}/"
+          fi

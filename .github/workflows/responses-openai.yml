@@ -1,0 +1,44 @@
+name: "Responses: OpenAI"
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check OpenAI credentials
+        id: check
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::warning::OPENAI_API_KEY not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    uses: ./.github/workflows/responses-run.yml
+    with:
+      provider_name: openai
+      models_json: '["openai/gpt-4o-mini","openai/gpt-4o","openai/o4-mini"]'
+      embedding_model: openai/text-embedding-3-small
+    secrets:
+      SERVER_EXTRA_ENV: |
+        OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+        TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+        EMBEDDING_MODEL=openai/text-embedding-3-small
+        EMBEDDING_PROVIDER=openai
+        EMBEDDING_PROVIDER_MODEL_ID=text-embedding-3-small

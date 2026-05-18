@@ -1,0 +1,81 @@
+name: Setup server
+description: Pull and start the distro container with health check
+
+inputs:
+  image_name:
+    description: 'Container image name'
+    required: true
+  image_tag:
+    description: 'Container image tag'
+    required: true
+  extra_env:
+    description: 'Extra env vars for docker run (one KEY=VALUE per line)'
+    required: false
+    default: ''
+  volumes:
+    description: 'Volume mounts for docker run (one host:container:mode per line)'
+    required: false
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: Start server
+      shell: bash
+      env:
+        IMAGE_NAME: ${{ inputs.image_name }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        INPUT_EXTRA_ENV: ${{ inputs.extra_env }}
+        INPUT_VOLUMES: ${{ inputs.volumes }}
+      run: |
+        docker pull "$IMAGE_NAME:$IMAGE_TAG"
+
+        docker_args=(
+          -d --net=host --name ogx
+          --env "POSTGRES_HOST=localhost"
+          --env "POSTGRES_PORT=5432"
+          --env "POSTGRES_DB=ogx"
+          --env "POSTGRES_USER=ogx"
+          --env "POSTGRES_PASSWORD=ogx"
+          --env "ENABLE_PGVECTOR=1"
+          --env "PGVECTOR_HOST=localhost"
+          --env "PGVECTOR_PORT=5432"
+          --env "PGVECTOR_DB=ogx"
+          --env "PGVECTOR_USER=ogx"
+          --env "PGVECTOR_PASSWORD=ogx"
+          --env "TRUSTYAI_LMEVAL_USE_K8S=False"
+        )
+
+        while IFS= read -r line; do
+          [[ -z "$line" ]] && continue
+          if [[ "$line" != *=* ]]; then
+            echo "::error::extra_env line is not KEY=VALUE: $line"
+            exit 1
+          fi
+          docker_args+=(--env "$line")
+        done <<< "$INPUT_EXTRA_ENV"
+
+        while IFS= read -r line; do
+          [[ -z "$line" ]] && continue
+          if [[ "$line" != *:* ]]; then
+            echo "::error::volumes line is not host:container[:mode]: $line"
+            exit 1
+          fi
+          docker_args+=(--volume "$line")
+        done <<< "$INPUT_VOLUMES"
+
+        docker_args+=("$IMAGE_NAME:$IMAGE_TAG")
+
+        docker run "${docker_args[@]}"
+
+        echo "Waiting for server..."
+        for _attempt in {1..60}; do
+          if curl -fsS http://127.0.0.1:8321/v1/health >/dev/null 2>&1; then
+            echo "Server ready"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "Server failed to start"
+        docker logs ogx || true
+        exit 1
