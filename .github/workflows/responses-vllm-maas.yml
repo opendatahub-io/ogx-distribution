@@ -8,12 +8,17 @@ on:
         required: false
         default: 'latest'
         type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
 
 jobs:
   check:
     runs-on: ubuntu-24.04
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
     steps:
       - name: Check MaaS credentials
         id: check
@@ -27,6 +32,16 @@ jobs:
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Resolve models
+        id: models
+        run: |
+          default='["vllm-inference/llama-3-2-3b"]'
+          input='${{ inputs.models }}'
+          if [ -z "$input" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(echo "$input" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
 
   test:
     needs: check
@@ -34,7 +49,7 @@ jobs:
     uses: ./.github/workflows/responses-run.yml
     with:
       provider_name: vllm-maas
-      models_json: '["vllm-inference/llama-3-2-3b"]'
+      models_json: ${{ needs.check.outputs.models_json }}
       embedding_model: vllm-embedding/nomic-embed-text-v1-5
     secrets:
       SERVER_EXTRA_ENV: |

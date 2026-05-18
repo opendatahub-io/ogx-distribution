@@ -8,12 +8,17 @@ on:
         required: false
         default: 'latest'
         type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
 
 jobs:
   check:
     runs-on: ubuntu-24.04
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
     steps:
       - name: Check OpenAI credentials
         id: check
@@ -26,6 +31,16 @@ jobs:
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Resolve models
+        id: models
+        run: |
+          default='["openai/gpt-4o-mini","openai/gpt-4o","openai/o4-mini"]'
+          input='${{ inputs.models }}'
+          if [ -z "$input" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(echo "$input" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
 
   test:
     needs: check
@@ -33,7 +48,7 @@ jobs:
     uses: ./.github/workflows/responses-run.yml
     with:
       provider_name: openai
-      models_json: '["openai/gpt-4o-mini","openai/gpt-4o","openai/o4-mini"]'
+      models_json: ${{ needs.check.outputs.models_json }}
       embedding_model: openai/text-embedding-3-small
     secrets:
       SERVER_EXTRA_ENV: |
