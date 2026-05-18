@@ -7,6 +7,7 @@ apis:
 - tool_runtime
 - vector_io
 - files
+- file_processors
 providers:
   inference:
   - provider_id: ${env.VLLM_URL:+vllm-inference}
@@ -165,6 +166,16 @@ providers:
       metadata_store:
         backend: sql_default
         table_name: files_metadata
+  file_processors:
+  - provider_id: pypdf
+    provider_type: inline::pypdf
+    config: {}
+  - provider_id: docling
+    provider_type: inline::docling
+    config: {}
+  - provider_id: docling-serve
+    provider_type: remote::docling-serve
+    config: {}
   batches:
   - provider_id: reference
     provider_type: inline::reference
