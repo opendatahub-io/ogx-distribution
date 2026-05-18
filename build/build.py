@@ -36,6 +36,10 @@ STRIPPED_PROVIDER_TYPES = {
     "inline::sentence-transformers",
     "inline::milvus",
     "inline::faiss",
+    "inline::docling",
+    "inline::markitdown",
+    "inline::pypdf",
+    "remote::docling-serve",
 }
 
 STRIPPED_CONFIG_HEADER = (
