@@ -18,6 +18,7 @@ uv pip install --upgrade \
 uv pip install \
     'fonttools>=4.60.2' \
     'google-genai>=1.69.0' \
+    'markitdown[all]' \
     'mcp>=1.23.0' \
     'nltk>=3.9.4' \
     'pymilvus==2.6.9' \
@@ -28,6 +29,7 @@ uv pip install \
     asyncpg \
     boto3 \
     chardet \
+    docling \
     einops \
     faiss-cpu \
     fastapi \
