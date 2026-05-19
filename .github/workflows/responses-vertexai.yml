@@ -1,0 +1,69 @@
+name: "Responses: Vertex AI"
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
+    steps:
+      - name: Check Vertex AI credentials
+        id: check
+        env:
+          VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        run: |
+          if [ -z "$VERTEX_AI_PROJECT" ] || [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
+            echo "::warning::Vertex AI credentials not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve models
+        id: models
+        run: |
+          default='["vertexai/publishers/google/models/gemini-2.0-flash"]'
+          input='${{ inputs.models }}'
+          if [ -z "$input" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(echo "$input" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    uses: ./.github/workflows/responses-run.yml
+    with:
+      provider_name: vertexai
+      models_json: ${{ needs.check.outputs.models_json }}
+      embedding_model: vertexai/publishers/google/models/gemini-embedding-2
+      gcp_auth: true
+    secrets:
+      SERVER_EXTRA_ENV: |
+        VERTEX_AI_PROJECT=${{ secrets.VERTEX_AI_PROJECT }}
+        VERTEX_AI_LOCATION=us-central1
+        GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp-credentials
+        TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+        EMBEDDING_MODEL=vertexai/publishers/google/models/gemini-embedding-2
+        EMBEDDING_PROVIDER=vertexai
+        EMBEDDING_PROVIDER_MODEL_ID=publishers/google/models/gemini-embedding-2
+      GCP_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}

@@ -1,0 +1,63 @@
+name: "Responses: vLLM MaaS"
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
+    steps:
+      - name: Check MaaS credentials
+        id: check
+        env:
+          MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
+          MAAS_VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
+        run: |
+          if [ -z "$MAAS_VLLM_URL" ] || [ -z "$MAAS_VLLM_API_TOKEN" ]; then
+            echo "::warning::MaaS vLLM credentials not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve models
+        id: models
+        run: |
+          default='["vllm-inference/llama-3-2-3b"]'
+          input='${{ inputs.models }}'
+          if [ -z "$input" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(echo "$input" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    uses: ./.github/workflows/responses-run.yml
+    with:
+      provider_name: vllm-maas
+      models_json: ${{ needs.check.outputs.models_json }}
+      embedding_model: vllm-embedding/nomic-embed-text-v1-5
+    secrets:
+      SERVER_EXTRA_ENV: |
+        VLLM_URL=${{ secrets.MAAS_VLLM_URL }}
+        VLLM_API_TOKEN=${{ secrets.MAAS_VLLM_API_TOKEN }}
+        VLLM_EMBEDDING_URL=${{ secrets.MAAS_EMBEDDING_URL }}
+        VLLM_EMBEDDING_API_TOKEN=${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+        TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+        EMBEDDING_MODEL=vllm-embedding/nomic-embed-text-v1-5
+        EMBEDDING_PROVIDER=vllm-embedding
+        EMBEDDING_PROVIDER_MODEL_ID=nomic-embed-text-v1-5
