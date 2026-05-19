@@ -12,7 +12,8 @@ on:
     paths:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
-      - 'distribution/**'
+      - 'Containerfile'
+      - 'dist/**'
       - 'tests/**'
   push:
     branches:
@@ -85,12 +86,12 @@ jobs:
         run: |
           # Check if any file in the distribution directory was modified in this push
           # Use git diff instead of parsing event payload (which is unreliable for merge commits)
-          if git diff --name-only HEAD^ HEAD | grep -q '^distribution/'; then
+          if git diff --name-only HEAD^ HEAD | grep -qE '^(dist/|Containerfile$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was modified in this push, will publish"
+            echo "dist/ or Containerfile was modified in this push, will publish"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was not modified in this push, skipping publish"
+            echo "dist/ and Containerfile were not modified in this push, skipping publish"
           fi
 
       - name: Install uv
@@ -102,32 +103,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - name: Generate Containerfile to build an image from an arbitrary ogx commit (workflow_dispatch/schedule)
+      - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch/schedule)
         if: contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
         env:
           OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: |
-          tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/ogx.git "$tmp_build_dir"
-          cd "$tmp_build_dir"
-          git checkout "$OGX_VERSION"
-          python3 -m venv .venv
-          source .venv/bin/activate
-          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
-          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
-          pip install --no-cache -e .
-          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
-          # now remove the install line from the Containerfile
-          cd -
-          python3 distribution/build.py
-          sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
+        run: uv run --with ruamel.yaml build/build.py
 
       - name: Build image for testing (${{ matrix.arch }})
         id: build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: ${{ matrix.platform }}
           push: false
           tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
@@ -320,25 +307,11 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Generate Containerfile to build an image from an arbitrary ogx commit (workflow_dispatch)
+      - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         env:
           OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: |
-          tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/ogx.git "$tmp_build_dir"
-          cd "$tmp_build_dir"
-          git checkout "$OGX_VERSION"
-          python3 -m venv .venv
-          source .venv/bin/activate
-          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
-          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
-          pip install --no-cache -e .
-          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
-          # now remove the install line from the Containerfile
-          cd -
-          python3 distribution/build.py
-          sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
+        run: uv run --with ruamel.yaml build/build.py
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
@@ -357,7 +330,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
