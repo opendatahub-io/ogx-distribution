@@ -65,7 +65,7 @@ ogx stack list-deps starter | xargs -L1 uv pip install
 # Choose "aaet-dev" if you are on the core OGX team.
 export VERTEX_AI_PROJECT=aaet-dev
 export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcloud/application_default_credentials.json
-ogx stack run starter
+ogx run starter
 ```
 
 ## Vertex OpenAI API examples with OGX
