@@ -56,6 +56,12 @@ providers:
     config:
       api_key: ${env.OPENAI_API_KEY:=}
       base_url: ${env.OPENAI_BASE_URL:=https://api.openai.com/v1}
+  - provider_id: ${env.GEMINI_API_KEY:+gemini}
+    provider_type: remote::gemini
+    config:
+      api_key: ${env.GEMINI_API_KEY:=}
+      access_token: ${env.GEMINI_ACCESS_TOKEN:=}
+      project: ${env.GEMINI_AI_PROJECT:=}
   vector_io:
   - provider_id: milvus
     provider_type: inline::milvus
