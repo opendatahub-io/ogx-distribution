@@ -2,16 +2,16 @@ FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
 
 ENV UV_INDEX_STRATEGY=unsafe-best-match
 
-COPY distribution/constraints.txt ${APP_ROOT}/constraints.txt
-COPY distribution/requirements.txt ${APP_ROOT}/requirements.txt
+COPY dist/constraints.txt ${APP_ROOT}/constraints.txt
+COPY dist/requirements.txt ${APP_ROOT}/requirements.txt
 RUN uv pip install --constraint ${APP_ROOT}/constraints.txt -r ${APP_ROOT}/requirements.txt
 
-COPY --chmod=755 distribution/install-common.sh ${APP_ROOT}/install-common.sh
+COPY --chmod=755 dist/install-common.sh ${APP_ROOT}/install-common.sh
 RUN ${APP_ROOT}/install-common.sh
 ENV TIKTOKEN_CACHE_DIR="${HOME}/.cache/tiktoken"
 
-COPY distribution/config.yaml ${APP_ROOT}/config.yaml
-COPY --chmod=755 distribution/entrypoint.sh ${APP_ROOT}/entrypoint.sh
+COPY dist/config.yaml ${APP_ROOT}/config.yaml
+COPY --chmod=755 dist/entrypoint.sh ${APP_ROOT}/entrypoint.sh
 
 #TODO: remove this once we have a stable version of ogx
 ENV OGX_DISABLE_VERSION_CHECK=true

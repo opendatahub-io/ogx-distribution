@@ -12,7 +12,8 @@ on:
     paths:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
-      - 'distribution/**'
+      - 'Containerfile'
+      - 'dist/**'
       - 'tests/**'
   push:
     branches:
@@ -85,12 +86,12 @@ jobs:
         run: |
           # Check if any file in the distribution directory was modified in this push
           # Use git diff instead of parsing event payload (which is unreliable for merge commits)
-          if git diff --name-only HEAD^ HEAD | grep -q '^distribution/'; then
+          if git diff --name-only HEAD^ HEAD | grep -qE '^(dist/|Containerfile$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was modified in this push, will publish"
+            echo "dist/ or Containerfile was modified in this push, will publish"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was not modified in this push, skipping publish"
+            echo "dist/ and Containerfile were not modified in this push, skipping publish"
           fi
 
       - name: Install uv
@@ -106,14 +107,14 @@ jobs:
         if: contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
         env:
           OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: uv run --with ruamel.yaml distribution/build.py
+        run: uv run --with ruamel.yaml build/build.py
 
       - name: Build image for testing (${{ matrix.arch }})
         id: build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: ${{ matrix.platform }}
           push: false
           tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
@@ -310,7 +311,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: uv run --with ruamel.yaml distribution/build.py
+        run: uv run --with ruamel.yaml build/build.py
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
@@ -329,7 +330,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}

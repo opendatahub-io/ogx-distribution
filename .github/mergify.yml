@@ -47,13 +47,15 @@ pull_request_rules:
               - or:
                   - files~=^\.github/actions/setup-vllm/action\.yml$
                   - files~=^\.github/workflows/redhat-distro-container\.yml$
-                  - files~=^distribution/
+                  - files~=^Containerfile$
+                  - files~=^dist/
                   - files~=^tests/
                   - files~=^vllm/
           - and:
               - -files~=^\.github/actions/setup-vllm/action\.yml$
               - -files~=^\.github/workflows/redhat-distro-container\.yml$
-              - -files~=^distribution/
+              - -files~=^Containerfile$
+              - -files~=^dist/
               - -files~=^tests/
               - -files~=^vllm/
 
@@ -94,12 +96,12 @@ pull_request_rules:
 
   - name: remind about Konflux Dockerfile when Containerfile changes
     conditions:
-      - files~=^distribution/Containerfile$
+      - files~=^Containerfile$
       - -closed
     actions:
       comment:
         message: >
-          ⚠️ **Heads up!** This PR modifies `distribution/Containerfile`.
+          ⚠️ **Heads up!** This PR modifies `Containerfile`.
 
           A corresponding change may be needed in the Konflux Dockerfile:
           https://github.com/red-hat-data-services/ogx-distribution/blob/main/Dockerfile.konflux

@@ -1,5 +1,3 @@
-exclude: 'build/'
-
 default_language_version:
     python: python3.12
 
@@ -48,7 +46,7 @@ repos:
     hooks:
       - id: pkg-gen
         name: Distribution Build
-        entry: ./distribution/build.py
+        entry: ./build/build.py
         language: python
         pass_filenames: false
         require_serial: true
@@ -59,10 +57,10 @@ repos:
 
       - id: doc-gen
         name: Distribution Documentation
-        entry: ./scripts/gen_distro_docs.py
+        entry: ./build/gen_distro_docs.py
         language: python
         pass_filenames: false
         require_serial: true
-        files: ^distribution/((build|config)\.yaml|build\.env)$
+        files: ^(build/(build\.yaml|build\.env)|dist/config\.yaml)$
         additional_dependencies:
           - pyyaml==6.0.2

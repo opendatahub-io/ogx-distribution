@@ -104,8 +104,8 @@ jobs:
           uv venv
           source .venv/bin/activate
           uv pip install 'ruamel.yaml>=0.18.0'
-          python3 distribution/build.py
-          podman build -f distribution/Containerfile -t "ogx-test:$TAG" .
+          python3 build/build.py
+          podman build -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Setup CI environment
         id: setup

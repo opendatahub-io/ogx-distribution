@@ -11,14 +11,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test_utils.sh"
 
 # Get repository and version from build.env
-BUILD_ENV="$SCRIPT_DIR/../distribution/build.env"
+BUILD_ENV="$SCRIPT_DIR/../build/build.env"
 OGX_VERSION=$(grep '^OGX_VERSION=' "$BUILD_ENV" | cut -d= -f2)
 if [ -z "$OGX_VERSION" ]; then
     echo "Error: Could not extract OGX_VERSION from build.env"
     exit 1
 fi
 # Extract repo URL from build.py constant
-OGX_REPO=$(grep 'OGX_GIT_REPO' "$SCRIPT_DIR/../distribution/build.py" | grep -o 'https://[^"]*')
+OGX_REPO=$(grep 'OGX_GIT_REPO' "$SCRIPT_DIR/../build/build.py" | grep -o 'https://[^"]*')
 if [ -z "$OGX_REPO" ]; then
     echo "Error: Could not extract OGX_GIT_REPO from build.py"
     exit 1
@@ -64,7 +64,7 @@ function run_integration_tests() {
     SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming"
 
     # Dynamically determine the path to config.yaml from the original script directory
-    STACK_CONFIG_PATH="$SCRIPT_DIR/../distribution/config.yaml"
+    STACK_CONFIG_PATH="$SCRIPT_DIR/../dist/config.yaml"
     if [ ! -f "$STACK_CONFIG_PATH" ]; then
         echo "Error: Could not find stack config at $STACK_CONFIG_PATH"
         exit 1

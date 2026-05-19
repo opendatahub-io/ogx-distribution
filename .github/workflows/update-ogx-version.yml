@@ -11,7 +11,7 @@ permissions: {}
 env:
   TAG: ${{ github.event.client_payload.tag }}
   BRANCH: chore/update-ogx-${{ github.event.client_payload.tag }}
-  VERSION_FILE: distribution/build.py
+  VERSION_FILE: build/build.py
   SOURCE_RUN_URL: ${{ github.event.client_payload.source_run_url }}
   MIDSTREAM_REPO_URL: https://github.com/opendatahub-io/ogx
 
@@ -178,7 +178,7 @@ jobs:
 
           ## Test plan
 
-          - [ ] Review the generated `distribution/Containerfile` changes
+          - [ ] Review the generated `dist/config.yaml` and `dist/requirements.txt` changes
           - [ ] Verify the new tag exists in opendatahub-io/ogx
           - [ ] Merge and confirm the distribution container build succeeds
           EOF
