@@ -33,11 +33,13 @@ providers:
       api_token: ${env.VLLM_EMBEDDING_API_TOKEN:=fake}
       tls_verify: ${env.VLLM_EMBEDDING_TLS_VERIFY:=true}
       refresh_models: ${env.VLLM_EMBEDDING_REFRESH_MODELS:=false}
-  - provider_id: ${env.AWS_BEARER_TOKEN_BEDROCK:+bedrock}
+  - provider_id: bedrock
     provider_type: remote::bedrock
     config:
       api_key: ${env.AWS_BEARER_TOKEN_BEDROCK:=}
       region_name: ${env.AWS_DEFAULT_REGION:=us-east-2}
+      aws_role_arn: ${env.AWS_ROLE_ARN:=}
+      aws_web_identity_token_file: ${env.AWS_WEB_IDENTITY_TOKEN_FILE:=}
   - provider_id: ${env.WATSONX_API_KEY:+watsonx}
     provider_type: remote::watsonx
     config:

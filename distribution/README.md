@@ -16,7 +16,7 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |
 | inference | remote::azure | No | ❌ | Set the `AZURE_API_KEY` environment variable |
-| inference | remote::bedrock | No | ❌ | Set the `AWS_BEARER_TOKEN_BEDROCK` environment variable |
+| inference | remote::bedrock | No | ✅ | N/A |
 | inference | remote::openai | No | ❌ | Set the `OPENAI_API_KEY` environment variable |
 | inference | remote::vertexai | No | ❌ | Set the `VERTEX_AI_PROJECT` environment variable |
 | inference | remote::vllm | No | ❌ | Set the `VLLM_URL` environment variable |
