@@ -2,7 +2,7 @@
 #
 # Reference: https://hub.docker.com/r/vllm/vllm-openai-cpu
 
-FROM vllm/vllm-openai-cpu:v0.20.2
+FROM vllm/vllm-openai-cpu:v0.21.0
 
 RUN pip install "huggingface-hub[cli]"
 
