@@ -314,8 +314,22 @@ def get_dependencies():
                     packages.append(parts_list[i])
                     i += 1
 
-            # Sort and deduplicate packages
-            packages = sorted(set(packages))
+            # Deduplicate packages by name, keeping the highest version spec
+            seen: dict[str, str] = {}
+            for pkg in packages:
+                name = re.split(r"[><=!~\[]", pkg)[0].lower().replace("-", "_")
+                if name not in seen:
+                    seen[name] = pkg
+                else:
+                    from packaging.version import Version
+
+                    def _extract_ver(s):
+                        m = re.search(r"(\d+(?:\.\d+)*)", s)
+                        return Version(m.group(1)) if m else Version("0")
+
+                    if _extract_ver(pkg) > _extract_ver(seen[name]):
+                        seen[name] = pkg
+            packages = sorted(seen.values())
 
             # Add quotes to packages with >, <, or [ to prevent bash
             # redirection and glob interpretation (shellcheck SC2102).

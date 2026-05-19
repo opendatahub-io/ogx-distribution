@@ -204,6 +204,74 @@ function test_file_processor_pypdf {
   return 0
 }
 
+function test_rag_file_ingestion {
+  echo "===> Verifying RAG file ingestion pipeline (upload → vector store → index)..."
+
+  local pdf_path="$SCRIPT_DIR/fixtures/sample.pdf"
+  if [ ! -f "$pdf_path" ]; then
+    echo "===> Sample PDF not found at $pdf_path :("
+    return 1
+  fi
+
+  # 1. Upload file
+  upload_resp=$(curl -fsS "$OGX_BASE_URL/v1/files" \
+    -F "file=@$pdf_path;type=application/pdf" \
+    -F "purpose=assistants")
+  echo "Upload response: $upload_resp"
+
+  file_id=$(echo "$upload_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+  if [ -z "$file_id" ]; then
+    echo "===> Failed to upload file :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+  echo "===> Uploaded file: $file_id"
+
+  # 2. Create vector store
+  vs_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"smoke-test-rag"}')
+  echo "Vector store response: $vs_resp"
+
+  vs_id=$(echo "$vs_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+  if [ -z "$vs_id" ]; then
+    echo "===> Failed to create vector store :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+  echo "===> Created vector store: $vs_id"
+
+  # 3. Attach file to vector store
+  attach_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores/$vs_id/files" \
+    -H "Content-Type: application/json" \
+    -d "{\"file_id\":\"$file_id\"}")
+  echo "Attach response: $attach_resp"
+
+  # 4. Poll until file status is completed or failed (max 30s)
+  echo "===> Polling file ingestion status..."
+  for i in {1..30}; do
+    status_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores/$vs_id/files/$file_id" 2>/dev/null || echo '{}')
+    file_status=$(echo "$status_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null)
+
+    if [ "$file_status" = "completed" ]; then
+      echo "===> File ingestion completed successfully :)"
+      return 0
+    elif [ "$file_status" = "failed" ]; then
+      echo "===> File ingestion failed :("
+      echo "Status response: $status_resp"
+      docker logs ogx 2>/dev/null | tail -50 || true
+      return 1
+    fi
+
+    echo "  Attempt $i: status=$file_status, waiting..."
+    sleep 1
+  done
+
+  echo "===> File ingestion timed out after 30s :("
+  docker logs ogx 2>/dev/null | tail -50 || true
+  return 1
+}
+
 main() {
   echo "===> Starting smoke test..."
   start_and_wait_for_ogx_container
@@ -266,6 +334,10 @@ main() {
 
   if ! test_file_processor_pypdf; then
     failed_checks+=("file_processor:pypdf")
+  fi
+
+  if ! test_rag_file_ingestion; then
+    failed_checks+=("rag:file_ingestion")
   fi
 
   # Report results
