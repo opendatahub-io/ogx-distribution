@@ -22,6 +22,8 @@ uv pip install \
     'nltk>=3.9.4' \
     'pymilvus==2.6.9' \
     'pypdf>=6.10.0' \
+    'pypdf>=6.7.2' \
+    'sqlalchemy[asyncio]' \
     aiosqlite \
     asyncpg \
     boto3 \
@@ -46,7 +48,6 @@ uv pip install \
     scikit-learn \
     scipy \
     sentencepiece \
-    sqlalchemy[asyncio] \
     tokenizers \
     tqdm \
     transformers \

@@ -22,6 +22,7 @@ RUN if [ -z "${INFERENCE_MODEL}" ]; then \
     fi
 
 RUN --mount=type=secret,id=hf_token \
+    set -e && \
     for model in "${INFERENCE_MODEL}" "${EMBEDDING_MODEL}"; do \
         model_path="${MODEL_CACHE_DIR}/${model}" && \
         mkdir -p "${model_path}" && \

@@ -11,6 +11,7 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 | API | Provider | External? | Enabled by default? | How to enable |
 |-----|----------|-----------|---------------------|---------------|
 | batches | inline::reference | No | ✅ | N/A |
+| file_processors | inline::pypdf | No | ✅ | N/A |
 | files | inline::localfs | No | ✅ | N/A |
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |
