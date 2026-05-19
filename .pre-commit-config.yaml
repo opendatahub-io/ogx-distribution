@@ -19,7 +19,6 @@ repos:
     -   id: check-yaml
         args: ["--unsafe"]
     -   id: detect-private-key
-    -   id: requirements-txt-fixer
     -   id: mixed-line-ending
         args: [--fix=lf] # Forces to replace line ending by LF (line feed)
     -   id: check-executables-have-shebangs
@@ -64,6 +63,6 @@ repos:
         language: python
         pass_filenames: false
         require_serial: true
-        files: ^distribution/((build|config)\.yaml|Containerfile)$
+        files: ^distribution/((build|config)\.yaml|build\.env)$
         additional_dependencies:
           - pyyaml==6.0.2

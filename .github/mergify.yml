@@ -94,12 +94,12 @@ pull_request_rules:
 
   - name: remind about Konflux Dockerfile when Containerfile changes
     conditions:
-      - files~=^distribution/Containerfile.in$
+      - files~=^distribution/Containerfile$
       - -closed
     actions:
       comment:
         message: >
-          ⚠️ **Heads up!** This PR modifies `distribution/Containerfile.in`.
+          ⚠️ **Heads up!** This PR modifies `distribution/Containerfile`.
 
           A corresponding change may be needed in the Konflux Dockerfile:
           https://github.com/red-hat-data-services/ogx-distribution/blob/main/Dockerfile.konflux

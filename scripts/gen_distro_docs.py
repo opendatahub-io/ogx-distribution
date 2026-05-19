@@ -9,49 +9,36 @@ REPO_ROOT = Path(__file__).parent.parent
 
 
 def extract_ogx_version():
-    """Extract OGX version and repo owner from the Containerfile.
+    """Extract OGX version from build.env.
 
     Returns:
-        tuple: (version, repo_owner) where repo_owner defaults to 'opendatahub-io'
+        tuple: (version, repo_owner) where repo_owner is extracted from
+               OGX_GIT_REPO in build.py or defaults to 'opendatahub-io'
     """
-    containerfile_path = REPO_ROOT / "distribution" / "Containerfile"
+    versions_path = REPO_ROOT / "distribution" / "build.env"
 
-    if not containerfile_path.exists():
-        print(f"Error: {containerfile_path} not found")
+    if not versions_path.exists():
+        print(f"Error: {versions_path} not found")
         exit(1)
 
-    try:
-        with open(containerfile_path, "r") as file:
-            content = file.read()
+    env = {}
+    with open(versions_path, "r") as file:
+        for line in file:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                env[key.strip()] = value.strip()
 
-        # Check for "main" version in git URL format
-        main_pattern = r"git\+https://github\.com/([^/]+)/ogx\.git@main"
-        main_match = re.search(main_pattern, content)
-        if main_match:
-            repo_owner = main_match.group(1)
-            return ("main", repo_owner)
-
-        # Look for ogx version in pip install commands
-        # Pattern matches: ogx==X.Y.Z or ogx==X.Y.ZrcN+rhaiM
-        pattern = r"ogx==([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:rc[0-9]+)?(?:\+rhaiv\.[0-9]+)?)"
-        match = re.search(pattern, content)
-
-        if match:
-            return (match.group(1), "opendatahub-io")
-
-        # Look for git URL format: git+https://github.com/*/ogx.git@vVERSION or @VERSION
-        git_pattern = r"git\+https://github\.com/([^/]+)/ogx\.git@v?([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:rc[0-9]+)?(?:\+rhaiv\.[0-9]+)?)"
-        git_match = re.search(git_pattern, content)
-
-        if git_match:
-            return (git_match.group(2), git_match.group(1))
-
-        print("Error: Could not find ogx version in Containerfile")
+    version = env.get("OGX_VERSION")
+    if not version:
+        print("Error: OGX_VERSION not found in build.env")
         exit(1)
 
-    except Exception as e:
-        print(f"Error reading Containerfile: {e}")
-        exit(1)
+    # Strip leading 'v' prefix for display
+    if version.startswith("v"):
+        version = version[1:]
+
+    return (version, "opendatahub-io")
 
 
 def load_external_providers_info():
