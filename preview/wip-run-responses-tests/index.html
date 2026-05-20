@@ -46,6 +46,9 @@
   .summary-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; }
   .summary-card .value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
   .summary-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  #run-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); cursor: pointer; }
+  .active-row { background: var(--hover); font-weight: 600; }
+  tbody tr[data-run] { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -92,37 +95,76 @@ fetch('history.json').then(r => r.json()).then(data => {
   document.getElementById('loading').remove();
   if (!data.length) return;
 
-  const latest = data[data.length - 1];
-  const t = latest.totals;
-  const total = t.passed + t.failed + t.skipped + t.error;
-  const status = t.failed + t.error > 0 ? 'fail' : 'pass';
+  const v = n => n > 0 ? n : '<span class="zero">0</span>';
 
-  const providerCount = new Set(latest.models.map(m => m.provider)).size;
-  const modelCount = latest.models.length;
-  document.getElementById('meta').innerHTML = [
-    `OGX <b>${latest.ogx_version}</b>`,
-    `<code>${latest.branch}</code> @ <code>${latest.commit}</code>`,
-    `<a href="${latest.run_url}">Run #${latest.run_number}</a>`,
-    latest.date,
-    `<b>${providerCount}</b> providers, <b>${modelCount}</b> models`,
-    `<span class="badge badge-pass">${t.passed} passed</span>`,
-  ].join(' <span class="dot">&middot;</span> ');
+  function showRun(idx) {
+    const run = data[idx];
+    const t = run.totals;
+    const total = t.passed + t.failed + t.skipped + t.error;
 
-  // Summary cards
-  const sc = document.getElementById('summary-section');
-  sc.style.display = '';
-  document.getElementById('summary').innerHTML = [
-    ['--pass', t.passed, 'Passed'],
-    ['--fail', t.failed, 'Failed'],
-    ['--skip', t.skipped, 'Skipped'],
-    ['--error', t.error, 'Errors'],
-  ].map(([c, v, l]) => `<div class="summary-card"><div class="value" style="color:var(${c})">${v}</div><div class="label">${l}</div></div>`).join('') +
-  `<div class="summary-card"><div class="value">${total}</div><div class="label">Total</div></div>`;
+    const providerCount = new Set(run.models.map(m => m.provider)).size;
+    const modelCount = run.models.length;
+    document.getElementById('meta').innerHTML = [
+      `<select id="run-select">${data.map((d, i) => `<option value="${i}"${i === idx ? ' selected' : ''}>#${d.run_number} — ${d.date}</option>`).join('')}</select>`,
+      `OGX <b>${run.ogx_version}</b>`,
+      `<code>${run.branch}</code> @ <code>${run.commit}</code>`,
+      `<a href="${run.run_url}">Run #${run.run_number}</a>`,
+      `<b title="${[...new Set(run.models.map(m => m.provider))].join(', ')}">${providerCount}</b> providers, <b title="${run.models.map(m => m.provider + '/' + m.model).join(', ')}">${modelCount}</b> models`,
+      `<span class="badge badge-${t.failed + t.error > 0 ? 'fail' : 'pass'}">${t.passed} passed</span>`,
+    ].join(' <span class="dot">&middot;</span> ');
+
+    document.getElementById('run-select').addEventListener('change', function() {
+      const newIdx = parseInt(this.value);
+      history.replaceState(null, '', '#run-' + data[newIdx].run_number);
+      showRun(newIdx);
+    });
+
+    const sc = document.getElementById('summary-section');
+    sc.style.display = '';
+    document.getElementById('summary').innerHTML = [
+      ['--pass', t.passed, 'Passed'],
+      ['--fail', t.failed, 'Failed'],
+      ['--skip', t.skipped, 'Skipped'],
+      ['--error', t.error, 'Errors'],
+    ].map(([c, v, l]) => `<div class="summary-card"><div class="value" style="color:var(${c})">${v}</div><div class="label">${l}</div></div>`).join('') +
+    `<div class="summary-card"><div class="value">${total}</div><div class="label">Total</div></div>`;
+
+    document.getElementById('models-head').innerHTML =
+      '<tr><th>Provider</th><th>Model</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Skipped</th><th class="n">Errors</th><th class="n">Total</th></tr>';
+    document.getElementById('models').innerHTML = run.models.map(m => {
+      const mt = m.passed + m.failed + m.skipped + m.error;
+      return `<tr><td>${m.provider}</td><td class="model-name">${m.model}</td><td class="n pass">${v(m.passed)}</td><td class="n fail">${v(m.failed)}</td><td class="n skip">${v(m.skipped)}</td><td class="n err">${v(m.error)}</td><td class="n">${mt}</td></tr>`;
+    }).join('');
+
+    document.getElementById('history').innerHTML = [...data].reverse().map((d, _, arr) => {
+      const i = data.indexOf(d);
+      const active = d.run_number === run.run_number ? ' class="active-row"' : '';
+      return `<tr${active} data-run="${i}"><td>${d.date}</td><td>${d.ogx_version}</td><td><code>${d.branch}</code></td><td class="n pass">${v(d.totals.passed)}</td><td class="n fail">${v(d.totals.failed)}</td><td class="n skip">${v(d.totals.skipped)}</td><td class="n err">${v(d.totals.error)}</td><td><a href="${d.run_url}">#${d.run_number}</a></td></tr>`;
+    }).join('');
+
+    document.querySelectorAll('#history tr[data-run]').forEach(tr => {
+      tr.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A') return;
+        const i = parseInt(this.dataset.run);
+        history.replaceState(null, '', '#run-' + data[i].run_number);
+        showRun(i);
+      });
+    });
+  }
+
+  // Resolve initial run from URL hash or default to latest
+  let initialIdx = data.length - 1;
+  const hash = window.location.hash;
+  if (hash.startsWith('#run-')) {
+    const runNum = hash.slice(5);
+    const found = data.findIndex(d => String(d.run_number) === runNum);
+    if (found >= 0) initialIdx = found;
+  }
+  showRun(initialIdx);
 
   // Shared chart helpers
   const gridColor = C('--chart-grid');
   const textColor = C('--chart-text');
-  const labels = data.map(d => d.date.split(' ')[0]);
   const palette = ['#1a7f37', '#cf222e', '#0969da', '#9a6700', '#8250df', '#bc4c00', '#1b7c83', '#953800'];
   function makeLine(label, color, passedArr) {
     return { label, data: passedArr, borderColor: color, backgroundColor: color + '18', fill: false, tension: 0.3, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2, spanGaps: true };
@@ -210,21 +252,9 @@ fetch('history.json').then(r => r.json()).then(data => {
     options: provOpts
   });
 
-  // Model breakdown
-  const v = n => n > 0 ? n : '<span class="zero">0</span>';
-  document.getElementById('models-head').innerHTML =
-    '<tr><th>Provider</th><th>Model</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Skipped</th><th class="n">Errors</th><th class="n">Total</th></tr>';
-  document.getElementById('models').innerHTML = latest.models.map(m => {
-    const mt = m.passed + m.failed + m.skipped + m.error;
-    return `<tr><td>${m.provider}</td><td class="model-name">${m.model}</td><td class="n pass">${v(m.passed)}</td><td class="n fail">${v(m.failed)}</td><td class="n skip">${v(m.skipped)}</td><td class="n err">${v(m.error)}</td><td class="n">${mt}</td></tr>`;
-  }).join('');
-
-  // History
+  // History header
   document.getElementById('history-head').innerHTML =
     '<tr><th>Date</th><th>OGX</th><th>Branch</th><th class="n">Passed</th><th class="n">Failed</th><th class="n">Skipped</th><th class="n">Errors</th><th>Run</th></tr>';
-  document.getElementById('history').innerHTML = [...data].reverse().map(d =>
-    `<tr><td>${d.date}</td><td>${d.ogx_version}</td><td><code>${d.branch}</code></td><td class="n pass">${v(d.totals.passed)}</td><td class="n fail">${v(d.totals.failed)}</td><td class="n skip">${v(d.totals.skipped)}</td><td class="n err">${v(d.totals.error)}</td><td><a href="${d.run_url}">#${d.run_number}</a></td></tr>`
-  ).join('');
 });
 </script>
 </body>
