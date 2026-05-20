@@ -12,7 +12,7 @@ runs:
           -e POSTGRES_USER=ogx \
           -e POSTGRES_PASSWORD=ogx \
           -e POSTGRES_DB=ogx \
-          postgres:17
+          pgvector/pgvector:pg17
 
         # Wait for PostgreSQL to be ready
         echo "Waiting for PostgreSQL to be ready..."
