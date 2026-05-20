@@ -28,7 +28,7 @@ Models tested depend on available credentials:
 | vLLM inference model (`vllm-inference/Qwen/Qwen3-0.6B`) | `VLLM_INFERENCE_MODEL` | Yes |
 | Embedding model (`vllm-embedding/ibm-granite/granite-embedding-125m-english`) | `EMBEDDING_MODEL` | Yes (list only) |
 | Vertex AI model (`vertexai/publishers/google/models/gemini-2.0-flash`) | `VERTEX_AI_PROJECT` | Only if set |
-| OpenAI model (`openai/gpt-4o-mini`) | `OPENAI_API_KEY` | Only if set |
+| OpenAI model (`openai/gpt-5-nano`) | `OPENAI_API_KEY` | Only if set |
 
 #### Running locally
 

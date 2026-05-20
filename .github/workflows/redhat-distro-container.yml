@@ -64,7 +64,7 @@ jobs:
       # Model names - set defaults, overridden by MaaS configuration step
       VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3-0.6B
       VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.0-flash
-      OPENAI_INFERENCE_MODEL: openai/gpt-4o-mini
+      OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
@@ -153,7 +153,7 @@ jobs:
             status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
               -H "Authorization: Bearer $OPENAI_API_KEY" \
               -H "Content-Type: application/json" \
-              -d '{"model":"gpt-4o-mini","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
+              -d '{"model":"gpt-5-nano","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
               https://api.openai.com/v1/chat/completions)
             if [ "$status" != "200" ]; then
               echo "::warning::OpenAI API returned HTTP $status, skipping OpenAI tests"
