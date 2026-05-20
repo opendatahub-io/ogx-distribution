@@ -300,5 +300,38 @@
         "error": 12
       }
     ]
+  },
+  {
+    "date": "2026-05-20 15:20 UTC",
+    "run_number": "11",
+    "run_id": "26170613407",
+    "run_url": "https://github.com/opendatahub-io/ogx-distribution/actions/runs/26170613407",
+    "ogx_version": "1.0.2+rhaiv.0",
+    "branch": "wip-run-responses-tests",
+    "commit": "8d98793e",
+    "totals": {
+      "passed": 283,
+      "failed": 57,
+      "skipped": 206,
+      "error": 12
+    },
+    "models": [
+      {
+        "provider": "unknown",
+        "model": "unknown",
+        "passed": 129,
+        "failed": 2,
+        "skipped": 148,
+        "error": 0
+      },
+      {
+        "provider": "vllm-maas",
+        "model": "llama-3-2-3b",
+        "passed": 154,
+        "failed": 55,
+        "skipped": 58,
+        "error": 12
+      }
+    ]
   }
 ]
