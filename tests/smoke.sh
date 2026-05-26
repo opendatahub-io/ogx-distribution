@@ -47,6 +47,7 @@ function start_and_wait_for_ogx_container {
   if [ -n "${VERTEX_AI_PROJECT:-}" ] && [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     docker_args+=(
       --env "VERTEX_AI_PROJECT=$VERTEX_AI_PROJECT"
+      --env "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-global}"
       --env "GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp-credentials"
       --volume "$GOOGLE_APPLICATION_CREDENTIALS:/run/secrets/gcp-credentials:ro"
     )

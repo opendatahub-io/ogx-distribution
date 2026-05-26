@@ -1,0 +1,157 @@
+name: "Responses: vLLM MaaS"
+
+on:
+  workflow_call:
+    inputs:
+      models:
+        description: 'Comma-separated model IDs to test (leave empty for defaults)'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
+
+env:
+  PROVIDER_NAME: vllm-maas
+  EMBEDDING_MODEL: vllm-embedding/nomic-embed-text-v1-5
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
+  IMAGE_TAG: source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
+    steps:
+      - name: Check MaaS credentials
+        id: check
+        env:
+          MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
+          MAAS_VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
+        run: |
+          if [ -z "$MAAS_VLLM_URL" ] || [ -z "$MAAS_VLLM_API_TOKEN" ]; then
+            echo "::warning::MaaS vLLM credentials not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve models
+        id: models
+        run: |
+          default='["vllm-inference/llama-3-2-3b"]'
+          input='${{ inputs.models }}'
+          if [ -z "$input" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(echo "$input" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJson(needs.check.outputs.models_json) }}
+    permissions:
+      id-token: write
+      contents: read
+      checks: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Setup PostgreSQL
+        uses: ./.github/actions/setup-postgres
+
+      - name: Setup server
+        uses: ./.github/actions/setup-server
+        with:
+          image_name: ${{ env.IMAGE_NAME }}
+          image_tag: ${{ env.IMAGE_TAG }}
+          extra_env: |
+            VLLM_URL=${{ secrets.MAAS_VLLM_URL }}
+            VLLM_API_TOKEN=${{ secrets.MAAS_VLLM_API_TOKEN }}
+            VLLM_EMBEDDING_URL=${{ secrets.MAAS_EMBEDDING_URL }}
+            VLLM_EMBEDDING_API_TOKEN=${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+            TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+            EMBEDDING_MODEL=vllm-embedding/nomic-embed-text-v1-5
+            EMBEDDING_PROVIDER=vllm-embedding
+            EMBEDDING_PROVIDER_MODEL_ID=nomic-embed-text-v1-5
+
+      - name: Clone upstream tests
+        shell: bash
+        run: |
+          git clone --branch v1.0.0 --depth 1 https://github.com/ogx-ai/ogx.git /tmp/ogx-tests
+          cd /tmp/ogx-tests
+
+          uv venv --clear
+          source .venv/bin/activate
+          uv pip install -e . ogx-client ollama pytest langchain-openai langgraph
+
+      - name: Derive short model name
+        id: model
+        run: |
+          full='${{ matrix.model }}'
+          echo "short=${full##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Run responses tests
+        shell: bash
+        run: |
+          cd /tmp/ogx-tests
+          source .venv/bin/activate
+          mkdir -p /tmp/test-results
+
+          SKIP_TESTS="test_response_connector_resolution_mcp_tool"
+          MODEL='${{ matrix.model }}'
+          SHORT='${{ steps.model.outputs.short }}'
+
+          python -m pytest -s -v tests/integration/responses/ \
+            -k "not ($SKIP_TESTS)" \
+            --stack-config=server:"$GITHUB_WORKSPACE/distribution/config.yaml" \
+            --text-model="$MODEL" \
+            --embedding-model="$EMBEDDING_MODEL" \
+            --inference-mode=live \
+            --junit-xml="/tmp/test-results/results_${PROVIDER_NAME}_${SHORT}.xml" \
+            || [ $? -eq 5 ]
+
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2
+        with:
+          name: "${{ env.PROVIDER_NAME }}/${{ steps.model.outputs.short }}"
+          path: /tmp/test-results/*.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: responses-${{ env.PROVIDER_NAME }}-${{ steps.model.outputs.short }}
+          path: /tmp/test-results/
+          retention-days: 90
+
+      - name: Cleanup
+        if: always()
+        run: |
+          for c in ogx postgres; do
+            docker rm -f "$c" 2>/dev/null || true
+          done
