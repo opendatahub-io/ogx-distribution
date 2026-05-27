@@ -145,7 +145,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
               echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
-              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; } >> "$GITHUB_ENV"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
               exit 0
             fi
           fi
@@ -169,7 +169,9 @@ jobs:
               "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY")
             if [ "$status" != "200" ]; then
               echo "::warning::Gemini API returned HTTP $status, skipping Gemini tests"
-              echo "GEMINI_API_KEY=" >> "$GITHUB_ENV"
+              { echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
+            else
+              echo "ENABLE_GEMINI=1" >> "$GITHUB_ENV"
             fi
           fi
 

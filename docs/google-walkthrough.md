@@ -103,18 +103,19 @@ curl -X POST \
 
 OGX has both a ["Gemini"](https://ogx-ai.github.io/docs/next/providers/inference/remote_gemini) and "Vertex AI" provider. They are completely different APIs.
 
-The Gemini provider supports two authentication methods (`GEMINI_API_KEY` or `GEMINI_ACCESS_TOKEN`, but not both):
+The Gemini provider is enabled by setting `ENABLE_GEMINI=1`. It supports two authentication methods (`GEMINI_API_KEY` or `GEMINI_ACCESS_TOKEN` + `GEMINI_AI_PROJECT`, but not both):
 
 | Method | Env vars | Use case |
 |---|---|---|
-| **API key** | `GEMINI_API_KEY` | Keys from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key). Sent as a `?key=` query parameter. |
-| **OAuth/ADC** | `GEMINI_ACCESS_TOKEN` + `GEMINI_AI_PROJECT` | Short-lived tokens from `gcloud` SSO. Sent as `Authorization: Bearer` header. |
+| **API key** | `ENABLE_GEMINI` + `GEMINI_API_KEY` | Keys from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key). Sent as a `?key=` query parameter. |
+| **OAuth/ADC** | `ENABLE_GEMINI` + `GEMINI_ACCESS_TOKEN` + `GEMINI_AI_PROJECT` | Short-lived tokens from `gcloud` SSO. Sent as `Authorization: Bearer` header. |
 
 ### Running Gemini with OGX
 
 **API key path** — acquire a key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key):
 
 ```bash
+export ENABLE_GEMINI=1
 export GEMINI_API_KEY=<your-api-key>
 ```
 
@@ -125,6 +126,7 @@ export CLOUDSDK_CONFIG="/tmp/gcloud"
 
 gcloud auth application-default login --scopes='https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/generative-language.retriever'
 
+export ENABLE_GEMINI=1
 export GEMINI_ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
 # Choose "aaet-dev" if you are on the core OGX team.
 export GEMINI_AI_PROJECT=aaet-dev
