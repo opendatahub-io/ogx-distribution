@@ -22,7 +22,7 @@ on:
 
 env:
   PROVIDER_NAME: vllm-maas
-  EMBEDDING_MODEL: vllm-embedding/nomic-embed-text-v1-5
+  EMBEDDING_MODEL: vllm-embedding/Nomic-embed-text-v2-moe
   IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
   IMAGE_TAG: source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c
 
@@ -48,7 +48,7 @@ jobs:
       - name: Resolve models
         id: models
         run: |
-          default='["vllm-inference/llama-3-2-3b"]'
+          default='["vllm-inference/Qwen3.6-35B-A3B"]'
           input='${{ inputs.models }}'
           if [ -z "$input" ]; then
             echo "json=$default" >> "$GITHUB_OUTPUT"
@@ -92,9 +92,9 @@ jobs:
             VLLM_EMBEDDING_URL=${{ secrets.MAAS_EMBEDDING_URL }}
             VLLM_EMBEDDING_API_TOKEN=${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
             TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
-            EMBEDDING_MODEL=vllm-embedding/nomic-embed-text-v1-5
+            EMBEDDING_MODEL=vllm-embedding/Nomic-embed-text-v2-moe
             EMBEDDING_PROVIDER=vllm-embedding
-            EMBEDDING_PROVIDER_MODEL_ID=nomic-embed-text-v1-5
+            EMBEDDING_PROVIDER_MODEL_ID=Nomic-embed-text-v2-moe
 
       - name: Clone upstream tests
         shell: bash
@@ -134,7 +134,7 @@ jobs:
 
       - name: Publish test report
         if: always()
-        uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "${{ env.PROVIDER_NAME }}/${{ steps.model.outputs.short }}"
           path: /tmp/test-results/*.xml
