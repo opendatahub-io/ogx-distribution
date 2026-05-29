@@ -46,13 +46,14 @@ jobs:
           fi
       - name: Resolve models
         id: models
+        env:
+          INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_OPENAI }}
         run: |
           default='["openai/gpt-4.1-nano"]'
-          input='${{ inputs.models }}'
-          if [ -z "$input" ]; then
+          if [ -z "$INPUT_MODELS" ]; then
             echo "json=$default" >> "$GITHUB_OUTPUT"
           else
-            echo "json=$(echo "$input" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+            echo "json=$(printf '%s' "$INPUT_MODELS" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
           fi
 
   test:
@@ -64,7 +65,6 @@ jobs:
       matrix:
         model: ${{ fromJson(needs.check.outputs.models_json) }}
     permissions:
-      id-token: write
       contents: read
       checks: write
     steps:
@@ -95,8 +95,10 @@ jobs:
       - name: Clone upstream tests
         shell: bash
         run: |
-          git clone --branch v1.0.0 --depth 1 https://github.com/ogx-ai/ogx.git /tmp/ogx-tests
+          git clone --depth 1 https://github.com/ogx-ai/ogx.git /tmp/ogx-tests
           cd /tmp/ogx-tests
+          git fetch --depth 1 origin 9769a91c543e527389707e8a342339528d23c9f5 # v1.0.0
+          git checkout 9769a91c543e527389707e8a342339528d23c9f5
 
           uv venv --clear
           source .venv/bin/activate
@@ -104,20 +106,22 @@ jobs:
 
       - name: Derive short model name
         id: model
+        env:
+          FULL_MODEL: ${{ matrix.model }}
         run: |
-          full='${{ matrix.model }}'
-          echo "short=${full##*/}" >> "$GITHUB_OUTPUT"
+          echo "short=${FULL_MODEL##*/}" >> "$GITHUB_OUTPUT"
 
       - name: Run responses tests
         shell: bash
+        env:
+          MODEL: ${{ matrix.model }}
+          SHORT: ${{ steps.model.outputs.short }}
         run: |
           cd /tmp/ogx-tests
           source .venv/bin/activate
           mkdir -p /tmp/test-results
 
           SKIP_TESTS="test_response_connector_resolution_mcp_tool"
-          MODEL='${{ matrix.model }}'
-          SHORT='${{ steps.model.outputs.short }}'
 
           python -m pytest -s -v tests/integration/responses/ \
             -k "not ($SKIP_TESTS)" \
@@ -128,18 +132,9 @@ jobs:
             --junit-xml="/tmp/test-results/results_${PROVIDER_NAME}_${SHORT}.xml" \
             || [ $? -eq 5 ]
 
-      - name: Check for test results
-        id: results
-        if: always()
-        run: |
-          if ls /tmp/test-results/*.xml 1>/dev/null 2>&1; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Publish test report
-        if: always() && steps.results.outputs.found == 'true'
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           name: "${{ env.PROVIDER_NAME }}/${{ steps.model.outputs.short }}"
@@ -148,7 +143,7 @@ jobs:
           fail-on-error: 'false'
 
       - name: Upload artifacts
-        if: always() && steps.results.outputs.found == 'true'
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: responses-${{ env.PROVIDER_NAME }}-${{ steps.model.outputs.short }}
@@ -156,7 +151,7 @@ jobs:
           retention-days: 90
 
       - name: Cleanup
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           for c in ogx postgres; do
             docker rm -f "$c" 2>/dev/null || true

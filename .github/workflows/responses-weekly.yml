@@ -65,7 +65,7 @@ jobs:
   report:
     name: Publish Test Report
     runs-on: ubuntu-24.04
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [test-openai, test-vertexai, test-vllm-maas]
 
     steps:
@@ -90,7 +90,7 @@ jobs:
           merge-multiple: true
 
       - name: Debug downloaded artifacts
-        if: always()
+        if: ${{ !cancelled() }}
         run: find junit-results -type f 2>/dev/null || echo "No junit-results directory found"
 
       - name: List downloaded results
@@ -124,7 +124,7 @@ jobs:
           cp scripts/report-template.html "${PUBLISH_DIR}/index.html"
 
       - name: Deploy to GitHub Pages
-        if: always()
+        if: ${{ !cancelled() }}
         uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -133,7 +133,7 @@ jobs:
           keep_files: true
 
       - name: Print report URL
-        if: always()
+        if: ${{ !cancelled() }}
         run: |
           SUBFOLDER="${{ steps.deploy.outputs.subfolder }}"
           BASE="https://opendatahub-io.github.io/ogx-distribution"
