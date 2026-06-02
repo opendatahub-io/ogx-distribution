@@ -4,18 +4,20 @@
 
 This image contains the official Open Data Hub OGX distribution, with all the packages and configuration needed to run an OGX server in a containerized environment.
 
-The image is currently shipping with the Open Data Hub version of OGX version [0.8.0+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v0.8.0+rhaiv.0)
+The image is currently shipping with the Open Data Hub version of OGX version [1.0.2+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.0.2+rhaiv.0)
 
 You can see an overview of the APIs and Providers the image ships with in the table below.
 
 | API | Provider | External? | Enabled by default? | How to enable |
 |-----|----------|-----------|---------------------|---------------|
 | batches | inline::reference | No | ✅ | N/A |
+| file_processors | inline::pypdf | No | ✅ | N/A |
 | files | inline::localfs | No | ✅ | N/A |
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |
 | inference | remote::azure | No | ❌ | Set the `AZURE_API_KEY` environment variable |
 | inference | remote::bedrock | No | ❌ | Set the `AWS_BEARER_TOKEN_BEDROCK` environment variable |
+| inference | remote::gemini | No | ❌ | Set the `ENABLE_GEMINI` environment variable |
 | inference | remote::openai | No | ❌ | Set the `OPENAI_API_KEY` environment variable |
 | inference | remote::vertexai | No | ❌ | Set the `VERTEX_AI_PROJECT` environment variable |
 | inference | remote::vllm | No | ❌ | Set the `VLLM_URL` environment variable |

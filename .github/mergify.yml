@@ -49,11 +49,13 @@ pull_request_rules:
                   - files~=^\.github/workflows/redhat-distro-container\.yml$
                   - files~=^distribution/
                   - files~=^tests/
+                  - files~=^vllm/
           - and:
               - -files~=^\.github/actions/setup-vllm/action\.yml$
               - -files~=^\.github/workflows/redhat-distro-container\.yml$
               - -files~=^distribution/
               - -files~=^tests/
+              - -files~=^vllm/
 
     actions:
       merge:

@@ -49,16 +49,48 @@ STRIPPED_CONFIG_HEADER = (
     "# Stripped provider types (dependency only - available via custom config.yaml):\n"
 )
 
-CURRENT_OGX_VERSION = "v0.8.0+rhaiv.0"
-_raw_version = os.getenv("OGX_VERSION", CURRENT_OGX_VERSION)
-OGX_VERSION = _validate_version(_raw_version)
-OGX_CLIENT_VERSION = (
-    "0.8.0"  # Explicit version; set to None to auto-derive from OGX_VERSION
-)
+
+def _load_versions() -> dict[str, str]:
+    """Load version strings from distribution/versions.env."""
+    versions = {}
+    versions_path = Path(__file__).parent / "versions.env"
+    with open(versions_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                versions[key.strip()] = value.strip()
+    return versions
+
+
+def _init_versions() -> tuple[str, str]:
+    """Resolve OGX_VERSION and OGX_CLIENT_VERSION from versions.env and environment."""
+    versions = _load_versions()
+    for val in versions.values():
+        _validate_version(val)
+
+    ogx_version: str
+    if override := os.getenv("OGX_VERSION"):
+        ogx_version = _validate_version(override)
+    else:
+        ogx_version = f"v{versions['OGX_VERSION']}+{versions['OGX_RHAI_VERSION']}"
+
+    ogx_client_version: str
+    if client := versions.get("OGX_CLIENT_VERSION"):
+        ogx_client_version = client
+    else:
+        base_version = ogx_version.split("+")[0]
+        ogx_client_version = ".".join(base_version.split(".")[:3])
+
+    return ogx_version, ogx_client_version
+
+
+OGX_VERSION, OGX_CLIENT_VERSION = _init_versions()
 BASE_REQUIREMENTS = [
     f"ogx=={OGX_VERSION}",
 ]
 
+# TODO(efenness): It's likely that we don't need many of these dependencies - let's see what we can delete
 # Constrain packages we are patching to ensure reliable and repeatable build
 PINNED_DEPENDENCIES = [
     "'kfp-kubernetes==2.14.6'",
@@ -66,45 +98,32 @@ PINNED_DEPENDENCIES = [
     "'botocore==1.35.88'",
     "'boto3==1.35.88'",
     "'aiobotocore==2.16.1'",
-    "'ibm-cos-sdk-core==2.14.2'",
-    "'ibm-cos-sdk==2.14.2'",
-    "'setuptools==81.0.0'",  # due to bug in milvus-lite with unreleased fix: https://github.com/milvus-io/milvus-lite/pull/323
+    "'setuptools==80.10.2'",
+    "'milvus-lite==2.5.1; platform_machine != \"ppc64le\"'",
 ]
 
-source_install_command_pypi_client = """RUN uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@{ogx_version}#subdirectory=src/ogx_api'
-RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/ogx.git@{ogx_version}
-RUN uv pip install --no-cache --no-deps ogx-client=={ogx_client_version}"""
+source_install_command_pypi_client = """uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@{ogx_version}#subdirectory=src/ogx_api'
+uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/ogx.git@{ogx_version}
+uv pip install --no-cache --no-deps ogx-client=={ogx_client_version}"""
 
-source_install_command_git_client = """RUN uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@{ogx_version}#subdirectory=src/ogx_api'
-RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/ogx.git@{ogx_version}"""
+source_install_command_git_client = """uv pip install --no-cache 'ogx-api@git+https://github.com/opendatahub-io/ogx.git@{ogx_version}#subdirectory=src/ogx_api'
+uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/ogx.git@{ogx_version}"""
 
 
 def get_ogx_install(ogx_version):
-    # Use explicit client version if set, otherwise derive from ogx_version
-    # by removing +rhai suffix and restricting to x.y.z format (3 parts)
-    if OGX_CLIENT_VERSION:
-        ogx_client_version = OGX_CLIENT_VERSION
+    if not is_install_from_source(ogx_version):
+        return
+
+    print(f"Installing ogx from source: {ogx_version}")
+
+    if is_version_tag(ogx_version):
+        template = source_install_command_pypi_client
     else:
-        # Remove +rhai suffix and restrict to x.y.z (e.g., v0.6.0.1+rhai0 -> v0.6.0)
-        base_version = ogx_version.split("+")[0]
-        ogx_client_version = ".".join(base_version.split(".")[:3])
-    # If the version is a commit SHA or a short commit SHA, we need to install from source
-    if is_install_from_source(ogx_version):
-        print(f"Installing ogx from source: {ogx_version}")
+        template = source_install_command_git_client
 
-        # Determine if client should come from PyPI or git
-        # Version tags (v0.5.0+rhai0) use PyPI for client (stable release)
-        # Branch names (main, release-0.5.x) use git for client (matching branch)
-        if is_version_tag(ogx_version):
-            # Version tag - use PyPI for client (stable release)
-            template = source_install_command_pypi_client
-        else:
-            # Branch name - use git for client (matching branch)
-            template = source_install_command_git_client
-
-        result = template.replace("{ogx_version}", ogx_version)
-        result = result.replace("{ogx_client_version}", ogx_client_version)
-        return result.rstrip()
+    result = template.replace("{ogx_version}", ogx_version)
+    result = result.replace("{ogx_client_version}", OGX_CLIENT_VERSION)
+    return result.rstrip()
 
 
 def is_version_tag(version_str):
@@ -124,13 +143,10 @@ def is_version_tag(version_str):
 
 def is_install_from_source(ogx_version):
     """Check if version string requires git install (branch/commit) vs PyPI (version tag)."""
-    # Custom versions with +rhai suffix always install from source
     if "+rhai" in ogx_version:
         return True
-    # Version tags (v0.5.0, 0.5.0) use PyPI
     if is_version_tag(ogx_version):
         return False
-    # Everything else (branch names, commit SHAs) install from source
     return True
 
 
@@ -157,7 +173,6 @@ def check_ogx_version():
         )
         installed_version = result.stdout.strip()
 
-        # Extract version from BASE_REQUIREMENTS
         expected_version = None
         for req in BASE_REQUIREMENTS:
             if req.startswith("ogx=="):
@@ -168,9 +183,6 @@ def check_ogx_version():
             print("Error: ogx version mismatch!")
             print(f"  Expected: {expected_version}")
             print(f"  Installed: {installed_version}")
-            print(
-                "  If you just bumped the ogx version in BASE_REQUIREMENTS, you must update the version from .pre-commit-config.yaml"
-            )
             sys.exit(1)
 
     except subprocess.CalledProcessError as e:
@@ -194,7 +206,6 @@ def install_ogx_from_source(ogx_version):
             capture_output=True,
             text=True,
         )
-        # Print stdout if there's any output
         if result.stdout:
             print(result.stdout)
     except subprocess.CalledProcessError as e:
@@ -261,7 +272,7 @@ def generate_stripped_config():
 
 
 def get_dependencies():
-    """Execute the ogx stack build command and capture dependencies."""
+    """Execute the ogx list-deps command and capture dependencies."""
     cmd = ["ogx", "stack", "list-deps", "distribution/build.yaml"]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -277,7 +288,7 @@ def get_dependencies():
                 continue
 
             # New format: just packages, possibly with flags
-            cmd_parts = ["RUN", "uv", "pip", "install"]
+            cmd_parts = ["uv", "pip", "install"]
             packages_str = line
 
             # Parse packages and flags from the line
@@ -306,20 +317,21 @@ def get_dependencies():
             # Sort and deduplicate packages
             packages = sorted(set(packages))
 
-            # Add quotes to packages with > or < to prevent bash redirection
+            # Add quotes to packages with >, <, or [ to prevent bash
+            # redirection and glob interpretation (shellcheck SC2102).
             packages = [
-                f"'{package}'" if (">" in package or "<" in package) else package
+                f"'{package}'"
+                if (">" in package or "<" in package or "[" in package)
+                else package
                 for package in packages
             ]
 
             # Pin pymilvus to 2.6.9 to avoid gRPC crash
             # 2.6.10 crashes Milvus Lite gRPC init with empty dns:/// target
+            # Use plain pymilvus (no [milvus-lite] extra) so the explicit
+            # milvus-lite pin in PINNED_DEPENDENCIES is the sole source
             packages = [
-                "'pymilvus[milvus-lite]==2.6.9'"
-                if "pymilvus[milvus-lite]" in package
-                else "'pymilvus==2.6.9'"
-                if "pymilvus" in package
-                else package
+                "'pymilvus==2.6.9'" if "pymilvus" in package else package
                 for package in packages
             ]
 
@@ -363,7 +375,7 @@ def get_dependencies():
         # Add pinned dependencies FIRST to ensure version compatibility
         if PINNED_DEPENDENCIES:
             pinned_packages = " \\\n    ".join(PINNED_DEPENDENCIES)
-            pinned_cmd = f"RUN uv pip install --upgrade \\\n    {pinned_packages}"
+            pinned_cmd = f"uv pip install --upgrade \\\n    {pinned_packages}"
             all_deps.append(pinned_cmd)
 
         all_deps.extend(sorted(standard_deps))  # Regular pip installs
@@ -380,8 +392,36 @@ def get_dependencies():
         sys.exit(1)
 
 
-def generate_containerfile(dependencies, ogx_install):
-    """Generate Containerfile from template with dependencies."""
+def generate_install_deps_script(dependencies):
+    """Generate install-deps.sh script with all Python dependencies."""
+    output_path = Path("distribution/install-deps.sh")
+
+    lines = [
+        "#!/bin/bash",
+        "# WARNING: This file is auto-generated. Do not modify it manually.",
+        "# Generated by: distribution/build.py",
+        "set -euo pipefail",
+        "",
+        "uv pip install sqlalchemy",
+        "uv pip install opentelemetry-distro",
+        "uv pip install structlog zstandard",
+        "",
+        dependencies.rstrip(),
+        "",
+        "opentelemetry-bootstrap -a requirements | grep -v opentelemetry-instrumentation-botocore | uv pip install --requirement -",
+        "",
+        "uv pip install tiktoken==0.12.0",
+    ]
+
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+    os.chmod(output_path, 0o755)
+    print(f"Successfully generated {output_path}")
+
+
+def generate_containerfile(ogx_install):
+    """Generate Containerfile from template."""
     template_path = Path("distribution/Containerfile.in")
     output_path = Path("distribution/Containerfile")
 
@@ -389,32 +429,20 @@ def generate_containerfile(dependencies, ogx_install):
         print(f"Error: Template file {template_path} not found")
         sys.exit(1)
 
-    # Read template
     with open(template_path) as f:
         template_content = f.read()
 
-    # Add warning message at the top
-    warning = "# WARNING: This file is auto-generated. Do not modify it manually.\n# Generated by: distribution/build.py\n\n"
+    warning = "# WARNING: This file is auto-generated. Do not modify it manually.\n# Generated by: distribution/build.py\n"
 
-    # Use str.replace() instead of .format() to avoid format string injection.
-    # Dependencies and install commands may contain curly braces or other
-    # characters that would be interpreted by str.format().
     containerfile_content = warning + template_content
+
+    ogx_runs = ""
+    if ogx_install:
+        ogx_runs = "\n".join(f"RUN {line}" for line in ogx_install.strip().splitlines())
     containerfile_content = containerfile_content.replace(
-        "{dependencies}", dependencies.rstrip()
-    )
-    containerfile_content = containerfile_content.replace(
-        "{ogx_install_source}",
-        ogx_install if ogx_install else "",
+        "{ogx_install_source}", ogx_runs
     )
 
-    # Remove any blank lines that result from empty substitutions
-    containerfile_content = (
-        "\n".join(line for line in containerfile_content.splitlines() if line.strip())
-        + "\n"
-    )
-
-    # Write output
     with open(output_path, "w") as f:
         f.write(containerfile_content)
 
@@ -423,13 +451,10 @@ def generate_containerfile(dependencies, ogx_install):
 
 def main():
     check_command_installed("uv")
-
-    if shutil.which("ogx") is None:
-        install_ogx_from_source(OGX_VERSION)
+    install_ogx_from_source(OGX_VERSION)
 
     check_command_installed("ogx", "ogx-client")
 
-    # Do not perform version check if installing from source
     if not is_install_from_source(OGX_VERSION):
         print("Checking ogx version...")
         check_ogx_version()
@@ -443,8 +468,11 @@ def main():
     print("Getting ogx install...")
     ogx_install = get_ogx_install(OGX_VERSION)
 
+    print("Generating install-deps.sh...")
+    generate_install_deps_script(dependencies)
+
     print("Generating Containerfile...")
-    generate_containerfile(dependencies, ogx_install)
+    generate_containerfile(ogx_install)
 
     print("Done!")
 

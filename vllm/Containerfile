@@ -2,7 +2,7 @@
 #
 # Reference: https://hub.docker.com/r/vllm/vllm-openai-cpu
 
-FROM vllm/vllm-openai-cpu:v0.19.1
+FROM vllm/vllm-openai-cpu:v0.21.0
 
 RUN pip install "huggingface-hub[cli]"
 
@@ -22,6 +22,7 @@ RUN if [ -z "${INFERENCE_MODEL}" ]; then \
     fi
 
 RUN --mount=type=secret,id=hf_token \
+    set -e && \
     for model in "${INFERENCE_MODEL}" "${EMBEDDING_MODEL}"; do \
         model_path="${MODEL_CACHE_DIR}/${model}" && \
         mkdir -p "${model_path}" && \

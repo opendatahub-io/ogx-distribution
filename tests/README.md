@@ -28,7 +28,7 @@ Models tested depend on available credentials:
 | vLLM inference model (`vllm-inference/Qwen/Qwen3-0.6B`) | `VLLM_INFERENCE_MODEL` | Yes |
 | Embedding model (`vllm-embedding/ibm-granite/granite-embedding-125m-english`) | `EMBEDDING_MODEL` | Yes (list only) |
 | Vertex AI model (`vertexai/publishers/google/models/gemini-2.0-flash`) | `VERTEX_AI_PROJECT` | Only if set |
-| OpenAI model (`openai/gpt-4o-mini`) | `OPENAI_API_KEY` | Only if set |
+| OpenAI model (`openai/gpt-5-nano`) | `OPENAI_API_KEY` | Only if set |
 
 #### Running locally
 
@@ -57,7 +57,7 @@ Integration tests run the upstream [ogx pytest suite](https://github.com/ogx/ogx
 2. **Clones the ogx repository** at the matching version tag into `/tmp/ogx-integration-tests`.
 3. **Runs `pytest`** against `tests/integration/inference/` with required test dependencies installed, pointing at `distribution/config.yaml`.
    - `ogx-client` is required.
-   - `ollama` is explicitly installed because the upstream test fixtures import it, even though this distribution does not use Ollama as a provider.
+   - `ollama` is explicitly installed because the upstream test fixtures import it unconditionally (see [ogx-ai/ogx#5880](https://github.com/ogx-ai/ogx/issues/5880)).
 
 Tests are run for each configured inference model (vLLM, and optionally Vertex AI and OpenAI).
 
