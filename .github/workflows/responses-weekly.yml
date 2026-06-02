@@ -21,6 +21,14 @@ on:
         description: 'Vertex AI models (comma-separated, leave empty for defaults)'
         type: string
         default: ''
+      run_gemini:
+        description: 'Run Gemini tests'
+        type: boolean
+        default: true
+      gemini_models:
+        description: 'Gemini models (comma-separated, leave empty for defaults)'
+        type: string
+        default: ''
       run_vllm_maas:
         description: 'Run vLLM MaaS tests'
         type: boolean
@@ -53,6 +61,14 @@ jobs:
       models: ${{ inputs.vertexai_models }}
     secrets: inherit
 
+  # ── Gemini ──────────────────────────────────────────────────────
+  test-gemini:
+    if: inputs.run_gemini != false
+    uses: ./.github/workflows/responses-gemini.yml
+    with:
+      models: ${{ inputs.gemini_models }}
+    secrets: inherit
+
   # ── vLLM MaaS ──────────────────────────────────────────────────
   test-vllm-maas:
     if: github.event_name == 'schedule' || inputs.run_vllm_maas != false
@@ -65,8 +81,8 @@ jobs:
   report:
     name: Publish Test Report
     runs-on: ubuntu-24.04
-    if: ${{ !cancelled() }}
-    needs: [test-openai, test-vertexai, test-vllm-maas]
+    if: always()
+    needs: [test-openai, test-vertexai, test-gemini, test-vllm-maas]
 
     steps:
       - name: Checkout repository
