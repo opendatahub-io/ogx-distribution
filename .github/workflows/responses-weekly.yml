@@ -63,7 +63,7 @@ jobs:
 
   # ── Gemini ──────────────────────────────────────────────────────
   test-gemini:
-    if: inputs.run_gemini != false
+    if: github.event_name == 'schedule' || inputs.run_gemini != false
     uses: ./.github/workflows/responses-gemini.yml
     with:
       models: ${{ inputs.gemini_models }}
