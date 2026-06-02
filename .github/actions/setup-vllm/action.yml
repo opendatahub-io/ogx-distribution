@@ -8,7 +8,7 @@ runs:
       run: |
         # Set VLLM_ARGS based on VLLM_MODE
         if [[ "$VLLM_MODE" == "inference" ]]; then
-          VLLM_ARGS="--host 0.0.0.0 --port 8000 --enable-auto-tool-choice --tool-call-parser hermes --model /root/.cache/Qwen/Qwen3.5-0.8B --served-model-name Qwen/Qwen3.5-0.8B --max-model-len 8192 --gpu-memory-utilization 0.50"
+          VLLM_ARGS="--host 0.0.0.0 --port 8000 --enforce-eager --enable-auto-tool-choice --tool-call-parser hermes --model /root/.cache/Qwen/Qwen3.5-0.8B --served-model-name Qwen/Qwen3.5-0.8B --max-model-len 8192 --gpu-memory-utilization 0.50"
           VLLM_PORT=8000
         elif [[ "$VLLM_MODE" == "embedding" ]]; then
           VLLM_ARGS="--host 0.0.0.0 --port 8001 --model /root/.cache/ibm-granite/granite-embedding-125m-english --served-model-name ibm-granite/granite-embedding-125m-english --gpu-memory-utilization 0.25"
