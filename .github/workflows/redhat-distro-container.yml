@@ -65,7 +65,7 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
       VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3-0.6B
-      VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.0-flash
+      VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
@@ -412,7 +412,7 @@ jobs:
           sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0

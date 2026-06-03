@@ -50,7 +50,7 @@ jobs:
         env:
           INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_VERTEXAI }}
         run: |
-          default='["vertexai/publishers/google/models/gemini-2.0-flash"]'
+          default='["vertexai/publishers/google/models/gemini-2.5-flash"]'
           if [ -z "$INPUT_MODELS" ]; then
             echo "json=$default" >> "$GITHUB_OUTPUT"
           else
