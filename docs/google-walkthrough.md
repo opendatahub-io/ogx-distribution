@@ -35,7 +35,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   "https://aiplatform.googleapis.com/v1beta1/projects/${VERTEX_AI_PROJECT}/locations/global/endpoints/openapi/chat/completions" \
   -d '{
-        "model": "google/gemini-2.5-flash",
+        "model": "google/gemini-3.5-flash",
         "messages": [
           {
             "role": "system",
@@ -83,7 +83,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   "http://localhost:8321/v1/chat/completions" \
   -d '{
-        "model": "vertexai/google/gemini-2.5-flash",
+        "model": "vertexai/google/gemini-3.5-flash",
         "messages": [
           {
             "role": "system",
@@ -107,7 +107,7 @@ The Gemini provider is enabled by setting `ENABLE_GEMINI=1`. It supports two aut
 
 | Method | Env vars | Use case |
 |---|---|---|
-| **API key** | `ENABLE_GEMINI` + `GEMINI_API_KEY` | Keys from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key). Sent as a `?key=` query parameter. |
+| **API key** | `ENABLE_GEMINI` + `GEMINI_API_KEY` | Keys from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key). Sent as an `x-goog-api-key` header. |
 | **OAuth/ADC** | `ENABLE_GEMINI` + `GEMINI_ACCESS_TOKEN` + `GEMINI_AI_PROJECT` | Short-lived tokens from `gcloud` SSO. Sent as `Authorization: Bearer` header. |
 
 ### Running Gemini with OGX
@@ -167,7 +167,7 @@ Making a chat request:
 # Choose "aaet-dev" if you are on the core OGX team.
 GEMINI_AI_PROJECT=aaet-dev
 
-curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" \
+curl "https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $GEMINI_ACCESS_TOKEN" \
   -H "x-goog-user-project: $GEMINI_AI_PROJECT" \
