@@ -79,7 +79,7 @@ An orchestrator workflow (`responses-weekly.yml` / "Responses: Test Report") run
 | Provider | Default text model | Embedding model | Workflow |
 |----------|--------------------|-----------------|----------|
 | OpenAI | gpt-4.1-nano | text-embedding-3-small | `responses-openai.yml` |
-| Vertex AI | gemini-2.0-flash | gemini-embedding-2 | `responses-vertexai.yml` |
+| Vertex AI | gemini-2.5-flash | gemini-embedding-2 | `responses-vertexai.yml` |
 | vLLM MaaS | llama-3-2-3b | nomic-embed-text-v1-5 | `responses-vllm-maas.yml` |
 
 ### How it works
