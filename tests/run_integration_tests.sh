@@ -69,7 +69,15 @@ function run_integration_tests() {
     # so vLLM correctly rejects these requests with a 400 error. sentence-transformers silently
     # truncated without validation, masking the issue.
     # test_openai_completion_logprobs{,_streaming}: upstream schema defines logprobs as bool, should be int https://github.com/llamastack/llama-stack/issues/5253
-    SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming"
+    # test_openai_chat_completion_structured_output, test_simple_tool_call, test_streaming_tool_calls:
+    # These tests time out when running against Qwen3.5-0.8B on CPU. The upstream
+    # test fixtures hardcode a 30s timeout on the OpenAI client and default to 30s
+    # on the OGX client (via OGX_CLIENT_TIMEOUT). Structured output and tool calling
+    # require constrained decoding which is significantly slower on CPU, causing
+    # requests to exceed the 30s limit. The timeouts are set upstream in
+    # tests/integration/fixtures/common.py and cannot be overridden from our side
+    # for the OpenAI client path.
+    SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls"
 
     # Dynamically determine the path to config.yaml from the original script directory
     STACK_CONFIG_PATH="$SCRIPT_DIR/../distribution/config.yaml"
