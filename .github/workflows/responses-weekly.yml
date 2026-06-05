@@ -116,12 +116,12 @@ jobs:
 
           HISTORY_FILE="gh-pages/${SUBFOLDER:+$SUBFOLDER/}history.json"
 
-          python3 scripts/junit_to_history.py \
+          python3 .github/scripts/junit_to_history.py \
             junit-results \
             "$HISTORY_FILE" \
             "${PUBLISH_DIR}/history.json"
 
-          cp scripts/report-template.html "${PUBLISH_DIR}/index.html"
+          cp .github/scripts/report-template.html "${PUBLISH_DIR}/index.html"
 
       - name: Deploy to GitHub Pages
         if: ${{ !cancelled() }}
