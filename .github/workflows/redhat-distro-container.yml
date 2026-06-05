@@ -115,12 +115,12 @@ jobs:
           git checkout "$OGX_VERSION"
           python3 -m venv .venv
           source .venv/bin/activate
-          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
-          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
           pip install --no-cache -e .
-          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
-          # now remove the install line from the Containerfile
           cd -
+          # Use ogx-api version from versions.env (the upstream pyproject.toml
+          # fallback_version may reference an unpublished dev version)
+          source distribution/versions.env
+          pip install --no-cache "ogx-api==${OGX_CLIENT_VERSION}" ruamel.yaml
           python3 distribution/build.py
           sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
 
@@ -372,12 +372,12 @@ jobs:
           git checkout "$OGX_VERSION"
           python3 -m venv .venv
           source .venv/bin/activate
-          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
-          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
           pip install --no-cache -e .
-          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
-          # now remove the install line from the Containerfile
           cd -
+          # Use ogx-api version from versions.env (the upstream pyproject.toml
+          # fallback_version may reference an unpublished dev version)
+          source distribution/versions.env
+          pip install --no-cache "ogx-api==${OGX_CLIENT_VERSION}" ruamel.yaml
           python3 distribution/build.py
           sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
 
