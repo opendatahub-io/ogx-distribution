@@ -15,7 +15,7 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 | file_processors | inline::docling | No | ✅ | N/A |
 | file_processors | inline::markitdown | No | ✅ | N/A |
 | file_processors | inline::pypdf | No | ✅ | N/A |
-| file_processors | remote::docling-serve | No | ✅ | N/A |
+| file_processors | remote::docling-serve | No | ❌ | Set the `DOCLING_SERVE_URL` environment variable |
 | files | inline::localfs | No | ✅ | N/A |
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |

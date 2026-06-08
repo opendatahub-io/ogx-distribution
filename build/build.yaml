@@ -189,9 +189,11 @@ providers:
   - provider_id: pypdf
     provider_type: inline::pypdf
     config: {}
-  - provider_id: docling-serve
+  - provider_id: ${env.DOCLING_SERVE_URL:+docling-serve}
     provider_type: remote::docling-serve
-    config: {}
+    config:
+      base_url: ${env.DOCLING_SERVE_URL:=}
+      api_key: ${env.DOCLING_SERVE_API_KEY:=}
   batches:
   - provider_id: reference
     provider_type: inline::reference
