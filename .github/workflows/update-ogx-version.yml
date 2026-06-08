@@ -178,7 +178,7 @@ jobs:
 
           ## Test plan
 
-          - [ ] Review the generated `dist/config.yaml` and `dist/requirements.txt` changes
+          - [ ] Review the generated `distribution/config.yaml` and `distribution/requirements.txt` changes
           - [ ] Verify the new tag exists in opendatahub-io/ogx
           - [ ] Merge and confirm the distribution container build succeeds
           EOF

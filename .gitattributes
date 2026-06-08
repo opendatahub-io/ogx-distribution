@@ -1,3 +1,3 @@
-dist/config.yaml        linguist-generated=true
-dist/requirements.txt   linguist-generated=true
-dist/README.md          linguist-generated=true
+distribution/config.yaml        linguist-generated=true
+distribution/requirements.txt   linguist-generated=true
+distribution/README.md          linguist-generated=true

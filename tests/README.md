@@ -55,7 +55,7 @@ Integration tests run the upstream [ogx pytest suite](https://github.com/ogx/ogx
 
 1. **Extracts the ogx version** from `build/build.env` to ensure tests match the bundled version.
 2. **Clones the ogx repository** at the matching version tag into `/tmp/ogx-integration-tests`.
-3. **Runs `pytest`** against `tests/integration/inference/` with required test dependencies installed, pointing at `dist/config.yaml`.
+3. **Runs `pytest`** against `tests/integration/inference/` with required test dependencies installed, pointing at `distribution/config.yaml`.
    - `ogx-client` is required.
    - `ollama` is explicitly installed because the upstream test fixtures import it unconditionally (see [ogx-ai/ogx#5880](https://github.com/ogx-ai/ogx/issues/5880)).
 
@@ -110,7 +110,7 @@ Testing is automated via GitHub Actions workflows in `.github/workflows/`.
 
 The main CI pipeline that builds, tests, and publishes the container image. It runs on:
 
-- **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `dist/`, `Containerfile`, `tests/`, or workflow files change)
+- **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `distribution/`, `Containerfile`, `tests/`, or workflow files change)
 - **Pushes** to `main` and `rhoai-v*` branches
 - **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits
 - **Nightly schedule** (6 AM UTC) to test the `main` branch of ogx
@@ -123,7 +123,7 @@ Pipeline steps:
 4. **Start PostgreSQL** via the `setup-postgres` action
 5. **Run smoke tests** (`tests/smoke.sh`)
 6. **Run integration tests** (`tests/run_integration_tests.sh`)
-7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `dist/` or `Containerfile` changed, or on manual dispatch)
+7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `distribution/` or `Containerfile` changed, or on manual dispatch)
 8. **Notify Slack** on failure or successful publish
 
 Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
@@ -136,8 +136,8 @@ Runs on all pull requests and pushes to `main`. Executes the full pre-commit hoo
 - **Shellcheck** - Shell script linting
 - **Actionlint** - GitHub Actions workflow linting
 - **Standard hooks** - merge conflict detection, trailing whitespace, large file checks, YAML/JSON/TOML validation, executable shebangs, private key detection, mixed line endings
-- **Distribution Build** (`build/build.py`) - Regenerates `dist/config.yaml` and `dist/requirements.txt`
-- **Distribution Documentation** (`build/gen_distro_docs.py`) - Regenerates `dist/README.md`
+- **Distribution Build** (`build/build.py`) - Regenerates `distribution/config.yaml` and `distribution/requirements.txt`
+- **Distribution Documentation** (`build/gen_distro_docs.py`) - Regenerates `distribution/README.md`
 
 ### Semantic PR Titles (`semantic-pr.yml`)
 

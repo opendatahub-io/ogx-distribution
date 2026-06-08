@@ -85,7 +85,7 @@ def load_external_providers_info():
 
 def load_runtime_provider_types():
     """Load config.yaml and return the set of provider_types in the runtime config."""
-    config_path = REPO_ROOT / "dist" / "config.yaml"
+    config_path = REPO_ROOT / "distribution" / "config.yaml"
 
     if not config_path.exists():
         print(f"Error: {config_path} not found")
@@ -184,7 +184,7 @@ def gen_distro_table(providers_data, runtime_provider_types=None):
 
 def gen_distro_docs():
     build_path = REPO_ROOT / "build" / "build.yaml"
-    readme_path = REPO_ROOT / "dist" / "README.md"
+    readme_path = REPO_ROOT / "distribution" / "README.md"
 
     if not build_path.exists():
         print(f"Error: {build_path} not found")

@@ -31,7 +31,7 @@ PINNED_DEPENDENCIES = [
     'milvus-lite==2.5.1; platform_machine != "ppc64le"',
 ]
 
-CONSTRAINTS_FILE = Path("dist/constraints.txt")
+CONSTRAINTS_FILE = Path("distribution/constraints.txt")
 
 STRIPPED_PROVIDER_TYPES = {
     "inline::sentence-transformers",
@@ -146,7 +146,7 @@ def _build_venv(
 def generate_stripped_config():
     """Generate a stripped config.yaml from build.yaml, removing dependency-only providers."""
     build_path = Path("build/build.yaml")
-    output_path = Path("dist/config.yaml")
+    output_path = Path("distribution/config.yaml")
 
     if not build_path.exists():
         print(f"Error: {build_path} not found")
@@ -241,7 +241,7 @@ def get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
 
 def generate_requirements_file(dependencies, ogx_reqs: OgxRequirements, otel_packages):
     """Generate requirements.txt with all Python dependencies."""
-    output_path = Path("dist/requirements.txt")
+    output_path = Path("distribution/requirements.txt")
 
     all_packages = sorted(set(PINNED_DEPENDENCIES + dependencies + otel_packages))
 

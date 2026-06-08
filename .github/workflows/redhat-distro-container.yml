@@ -13,7 +13,7 @@ on:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
       - 'Containerfile'
-      - 'dist/**'
+      - 'distribution/**'
       - 'tests/**'
   push:
     branches:
@@ -88,12 +88,12 @@ jobs:
         run: |
           # Check if any file in the distribution directory was modified in this push
           # Use git diff instead of parsing event payload (which is unreliable for merge commits)
-          if git diff --name-only HEAD^ HEAD | grep -qE '^(dist/|Containerfile$)'; then
+          if git diff --name-only HEAD^ HEAD | grep -qE '^(distribution/|Containerfile$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "dist/ or Containerfile was modified in this push, will publish"
+            echo "distribution/ or Containerfile was modified in this push, will publish"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "dist/ and Containerfile were not modified in this push, skipping publish"
+            echo "distribution/ and Containerfile were not modified in this push, skipping publish"
           fi
 
       - name: Install uv
