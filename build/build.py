@@ -213,8 +213,10 @@ def get_dependencies(ogx_bin: Path) -> list[str]:
         parts = iter(shlex.split(line))
         for part in parts:
             match part:
+                # stripped because base images either already add the torch index as an extra index url, or include torch builds in the default index
                 case "--extra-index-url" | "--index-url":
                     next(parts, None)
+                # stripped because base images already provide the correct torch build, so sentence-transformers can safely resolve its dependencies without this guard
                 case "--no-deps":
                     continue
                 case _:
