@@ -1,0 +1,22 @@
+meta {
+  name: List Responses
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/responses
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has data array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("data");
+    expect(body.data).to.be.an("array");
+  });
+}

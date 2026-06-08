@@ -1,0 +1,22 @@
+meta {
+  name: Get Version
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1alpha/admin/version
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has version string", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("version");
+    expect(body.version).to.be.a("string");
+  });
+}
