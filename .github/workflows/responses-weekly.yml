@@ -104,11 +104,9 @@ jobs:
           path: gh-pages
 
       - name: Build report
-        env:
-          OGX_VERSION: ""
         run: |
-          source distribution/versions.env
-          export OGX_VERSION="${OGX_VERSION}+${OGX_RHAI_VERSION}"
+          source build/build.env
+          export OGX_VERSION
 
           SUBFOLDER="${{ steps.deploy.outputs.subfolder }}"
           PUBLISH_DIR="publish/${SUBFOLDER}"
