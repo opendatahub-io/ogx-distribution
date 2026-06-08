@@ -3,3 +3,7 @@
 pymilvus==2.6.9
 # milvus-lite<3.0.0 requires pkg_resources, which was dropped in setuptools 81.0.0
 setuptools<81.0.0
+# google-genai 2.x has an httpx event loop lifecycle bug that causes
+# RuntimeError: Event loop is closed on Vertex AI inference requests
+# https://github.com/googleapis/python-genai/issues/1518
+google-genai>=1.69.0,<2.0.0
