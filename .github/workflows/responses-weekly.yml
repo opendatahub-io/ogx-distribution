@@ -104,11 +104,9 @@ jobs:
           path: gh-pages
 
       - name: Build report
-        env:
-          OGX_VERSION: ""
         run: |
-          source distribution/versions.env
-          export OGX_VERSION="${OGX_VERSION}+${OGX_RHAI_VERSION}"
+          source build/build.env
+          export OGX_VERSION
 
           SUBFOLDER="${{ steps.deploy.outputs.subfolder }}"
           PUBLISH_DIR="publish/${SUBFOLDER}"
@@ -116,12 +114,12 @@ jobs:
 
           HISTORY_FILE="gh-pages/${SUBFOLDER:+$SUBFOLDER/}history.json"
 
-          python3 scripts/junit_to_history.py \
+          python3 .github/scripts/junit_to_history.py \
             junit-results \
             "$HISTORY_FILE" \
             "${PUBLISH_DIR}/history.json"
 
-          cp scripts/report-template.html "${PUBLISH_DIR}/index.html"
+          cp .github/scripts/report-template.html "${PUBLISH_DIR}/index.html"
 
       - name: Deploy to GitHub Pages
         if: ${{ !cancelled() }}

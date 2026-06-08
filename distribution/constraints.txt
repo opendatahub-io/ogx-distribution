@@ -1,0 +1,5 @@
+# Pin pymilvus to 2.6.9 to avoid gRPC crash
+# 2.6.10 crashes Milvus Lite gRPC init with empty dns:/// target
+pymilvus==2.6.9
+# milvus-lite<3.0.0 requires pkg_resources, which was dropped in setuptools 81.0.0
+setuptools<81.0.0

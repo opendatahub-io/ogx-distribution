@@ -53,7 +53,7 @@ export OPENAI_API_KEY="<key>"
 
 Integration tests run the upstream [ogx pytest suite](https://github.com/ogx/ogx) against the distribution's running server. The script:
 
-1. **Extracts the ogx version** from the generated `distribution/Containerfile` to ensure tests match the bundled version.
+1. **Extracts the ogx version** from `build/build.env` to ensure tests match the bundled version.
 2. **Clones the ogx repository** at the matching version tag into `/tmp/ogx-integration-tests`.
 3. **Runs `pytest`** against `tests/integration/inference/` with required test dependencies installed, pointing at `distribution/config.yaml`.
    - `ogx-client` is required.
@@ -110,9 +110,9 @@ Testing is automated via GitHub Actions workflows in `.github/workflows/`.
 
 The main CI pipeline that builds, tests, and publishes the container image. It runs on:
 
-- **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `distribution/`, `tests/`, or workflow files change)
+- **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `distribution/`, `Containerfile`, `tests/`, or workflow files change)
 - **Pushes** to `main` and `rhoai-v*` branches
-- **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits.
+- **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits
 - **Nightly schedule** (6 AM UTC) to test the `main` branch of ogx
 
 Pipeline steps:
@@ -123,7 +123,7 @@ Pipeline steps:
 4. **Start PostgreSQL** via the `setup-postgres` action
 5. **Run smoke tests** (`tests/smoke.sh`)
 6. **Run integration tests** (`tests/run_integration_tests.sh`)
-7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `distribution/` changed, or on manual dispatch)
+7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `distribution/` or `Containerfile` changed, or on manual dispatch)
 8. **Notify Slack** on failure or successful publish
 
 Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
@@ -136,8 +136,8 @@ Runs on all pull requests and pushes to `main`. Executes the full pre-commit hoo
 - **Shellcheck** - Shell script linting
 - **Actionlint** - GitHub Actions workflow linting
 - **Standard hooks** - merge conflict detection, trailing whitespace, large file checks, YAML/JSON/TOML validation, executable shebangs, private key detection, mixed line endings
-- **Distribution Build** (`distribution/build.py`) - Regenerates `distribution/Containerfile`
-- **Distribution Documentation** (`scripts/gen_distro_docs.py`) - Regenerates `distribution/README.md`
+- **Distribution Build** (`build/build.py`) - Regenerates `distribution/config.yaml` and `distribution/requirements.txt`
+- **Distribution Documentation** (`build/gen_distro_docs.py`) - Regenerates `distribution/README.md`
 
 ### Semantic PR Titles (`semantic-pr.yml`)
 
@@ -148,7 +148,7 @@ Validates that pull request titles follow [Conventional Commits](https://www.con
 Triggered via `repository_dispatch` (type: `update-ogx-version`) from the opendatahub-io/ogx midstream repo when a new release is tagged. The workflow:
 
 1. **Validates** the tag format (`vX.Y.Z[.W]+rhaiv.N`) and runs preflight checks (version not already set, branch doesn't exist)
-2. **Updates** `CURRENT_LLAMA_STACK_VERSION` in `distribution/build.py`
+2. **Updates** `CURRENT_OGX_VERSION` in `build/build.py`
 3. **Runs pre-commit** to regenerate distribution artifacts (Containerfile, README)
 4. **Opens a pull request** against `main` with the version bump
 5. **Notifies Slack** with the PR link for review
