@@ -124,6 +124,38 @@ function test_model_openai_inference {
   fi
 }
 
+function test_messages_basic {
+  validate_model_parameter "$1"
+  local model="$1"
+  echo "===> Testing Messages API (/v1/messages) single-turn request for model $model..."
+  # Anthropic-compatible Messages API. The anthropic-version header is required.
+  resp=$(curl -fsS "$OGX_BASE_URL/v1/messages" \
+    -H "Content-Type: application/json" \
+    -H "anthropic-version: 2023-06-01" \
+    -d "{\"model\": \"$model\", \"max_tokens\": 128, \"messages\": [{\"role\": \"user\", \"content\": \"What is 2+2? Reply with just the number.\"}]}")
+
+  # Validate the Anthropic response shape: a `message` from the `assistant`
+  # containing at least one non-empty text block.
+  if echo "$resp" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+assert data.get("type") == "message", f"type={data.get(\"type\")!r}"
+assert data.get("role") == "assistant", f"role={data.get(\"role\")!r}"
+content = data.get("content") or []
+text_blocks = [b for b in content if b.get("type") == "text" and b.get("text")]
+assert text_blocks, f"no non-empty text blocks: {content}"
+'; then
+    echo "===> Messages API is working :)"
+    return 0
+  else
+    echo "===> Messages API is not working :("
+    echo "Response: $resp"
+    echo "Container logs:"
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+}
+
 function test_postgres_tables_exist {
   echo "===> Verifying PostgreSQL tables have been created..."
 
@@ -213,7 +245,35 @@ function test_file_processor_pypdf {
   return 0
 }
 
+function wait_for_ogx_health {
+  echo "Waiting for OGX server..."
+  for i in {1..60}; do
+    if [ "$(curl -fsS "$OGX_BASE_URL/v1/health" 2>/dev/null)" == '{"status":"OK"}' ]; then
+      echo "OGX server is up!"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "OGX server failed to become healthy :("
+  docker logs ogx 2>/dev/null | tail -50 || true
+  return 1
+}
+
 main() {
+  # Messages-only mode: the container is already running (started elsewhere,
+  # e.g. the setup-server action). Run just the Messages API smoke against
+  # MESSAGES_SMOKE_MODEL and exit. Used by the messages-openai.yml workflow.
+  if [ "${MESSAGES_SMOKE_ONLY:-false}" == "true" ]; then
+    echo "===> Running Messages API smoke only (model: ${MESSAGES_SMOKE_MODEL:-<unset>})..."
+    wait_for_ogx_health || exit 1
+    if test_messages_basic "${MESSAGES_SMOKE_MODEL:-}"; then
+      echo "===> Messages API smoke completed successfully!"
+      return 0
+    fi
+    echo "===> Messages API smoke failed!"
+    exit 1
+  fi
+
   echo "===> Starting smoke test..."
   start_and_wait_for_ogx_container
 
@@ -272,6 +332,12 @@ main() {
         failed_checks+=("inference:$model")
       fi
     done
+
+    # Basic Messages API (/v1/messages) smoke against the vLLM model
+    # (always available; supports native Anthropic passthrough).
+    if ! test_messages_basic "$VLLM_INFERENCE_MODEL"; then
+      failed_checks+=("messages:$VLLM_INFERENCE_MODEL")
+    fi
 
     # Verify PostgreSQL tables and data
     if ! test_postgres_tables_exist; then

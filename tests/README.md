@@ -10,6 +10,7 @@ All test scripts live in the `tests/` directory:
 |------|---------|
 | `smoke.sh` | Smoke tests against a running OGX container |
 | `run_integration_tests.sh` | Integration tests using upstream ogx's pytest suite |
+| `messages_agent_sdk.py` | Basic Claude Agent SDK session against the Messages API |
 | `test_utils.sh` | Shared utility functions (e.g., `validate_model_parameter`) |
 
 ### Smoke Tests (`smoke.sh`)
@@ -19,7 +20,10 @@ Smoke tests verify the container image works end-to-end. The script:
 1. **Starts the OGX container** with environment variables for inference models, embedding models, and database configuration, then waits up to 60 seconds for the `/v1/health` endpoint to return `OK`.
 2. **Model listing** - Verifies each configured model appears in the `/v1/models` response.
 3. **OpenAI-compatible inference** - Sends a chat completion request to `/v1/chat/completions` and validates the response.
-4. **PostgreSQL verification** - Checks that expected database tables (`ogx_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
+4. **Messages API** - Sends a single-turn request to the Anthropic-compatible `/v1/messages` endpoint and validates the response shape (a `message` from the `assistant` with a non-empty text block).
+5. **PostgreSQL verification** - Checks that expected database tables (`ogx_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
+
+Setting `MESSAGES_SMOKE_ONLY=true` runs **only** the Messages API check against `MESSAGES_SMOKE_MODEL` and assumes the container is already running (it does not start one). This mode is used by the `messages-openai.yml` workflow.
 
 Models tested depend on available credentials:
 
@@ -102,6 +106,33 @@ Prerequisites:
 ./tests/run_integration_tests.sh
 ```
 
+### Claude Agent SDK Session (`messages_agent_sdk.py`)
+
+Drives a basic 3-turn conversation through the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python), which talks to the server's Anthropic-compatible Messages API (`/v1/messages`). This proves the shipped image can serve a real Agent SDK session, not just a single request. Each turn references the previous one, so a broken session (no conversational continuity) surfaces as a failure rather than a silent pass.
+
+Configuration (environment variables):
+
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_BASE_URL` | OGX server base URL (default `http://127.0.0.1:8321`) |
+| `ANTHROPIC_API_KEY` | Sent to OGX but not validated for local providers (default `fake`) |
+| `MESSAGES_AGENT_MODEL` | OGX model id passed through as the Anthropic `model` (e.g. `openai/gpt-4.1-nano`) |
+
+#### Running locally
+
+Prerequisites: Python 3.10+, Node.js, the Claude Code CLI, and the Agent SDK.
+
+```bash
+npm install -g @anthropic-ai/claude-code
+uv venv && source .venv/bin/activate
+uv pip install claude-agent-sdk anyio
+
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8321"
+export ANTHROPIC_API_KEY="fake"
+export MESSAGES_AGENT_MODEL="openai/gpt-4.1-nano"
+python tests/messages_agent_sdk.py
+```
+
 ## CI/CD Pipelines
 
 Testing is automated via GitHub Actions workflows in `.github/workflows/`.
@@ -127,6 +158,29 @@ Pipeline steps:
 8. **Notify Slack** on failure or successful publish
 
 Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
+
+> [!NOTE]
+> The basic Messages API check (`/v1/messages`) runs as part of `smoke.sh`, so it is exercised on every PR via this pipeline against the locally-built vLLM model.
+
+### Messages API + Claude Agent SDK (`messages-openai.yml`, `messages-vllm-maas.yml`)
+
+Per-provider workflows that mirror their `responses-*.yml` counterparts. Each pulls the published image, boots it with the Messages API enabled and the provider's credentials set, then runs two distinct paths as separate steps so a failure clearly identifies which one broke:
+
+1. **Messages API basic** - `smoke.sh` in `MESSAGES_SMOKE_ONLY` mode sends a single-turn `/v1/messages` request and asserts the response shape.
+2. **Claude Agent SDK session** - `messages_agent_sdk.py` runs a 3-turn Agent SDK conversation against `/v1/messages`.
+
+| Workflow | Provider | Path exercised |
+|----------|----------|----------------|
+| `messages-openai.yml` | OpenAI (`OPENAI_API_KEY`) | Anthropic ⇄ OpenAI translation |
+| `messages-vllm-maas.yml` | vLLM MaaS (`MAAS_VLLM_URL` / `MAAS_VLLM_API_TOKEN`) | Native `/v1/messages` passthrough |
+
+The model under test is resolved as `inputs.models` → `vars.TEST_MODELS_<PROVIDER>` (a repo Actions variable) → a hardcoded fallback, matching the `responses-*.yml` workflows. On `messages-vllm-maas.yml` the configured MaaS model can be small (e.g. `Qwen3-0.6B`), so the **Agent SDK session step is non-blocking** there (`continue-on-error`) — it still reports signal but won't fail the workflow on a small-model flake. The basic request step is blocking on both workflows.
+
+Each is `workflow_call` + `workflow_dispatch`, and skips automatically when its credentials are not configured (e.g. fork PRs).
+
+### Messages Weekly (`messages-weekly.yml`)
+
+A dedicated weekly orchestrator (Sundays 23:00 UTC) that runs the per-provider messages workflows above. Kept separate from `responses-weekly.yml` because these are different APIs with different harnesses; the messages tests do not emit JUnit, so there is no shared report job to combine. Supports `workflow_dispatch` with per-provider toggles.
 
 ### Pre-commit (`pre-commit.yml`)
 

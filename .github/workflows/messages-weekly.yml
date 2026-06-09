@@ -1,0 +1,46 @@
+name: "Messages: Weekly"
+
+# Dev-preview coverage for the Anthropic-compatible Messages API (/v1/messages)
+# and a basic Claude Agent SDK session, across providers. Kept separate from the
+# Responses suite: these are different APIs with different harnesses, and the
+# messages tests do not (yet) emit JUnit, so there is no shared report job to
+# combine. Per-provider logic lives in the messages-*.yml workflows below.
+
+on:
+  schedule:
+    - cron: '0 23 * * 0'  # Sunday 23:00 UTC (after responses-weekly at 22:00)
+  workflow_dispatch:
+    inputs:
+      run_openai:
+        description: 'Run Messages OpenAI tests'
+        type: boolean
+        default: true
+      openai_models:
+        description: 'OpenAI models (comma-separated, leave empty for defaults)'
+        type: string
+        default: ''
+      run_vllm_maas:
+        description: 'Run Messages vLLM MaaS tests'
+        type: boolean
+        default: true
+      vllm_maas_models:
+        description: 'vLLM MaaS models (comma-separated, leave empty for defaults)'
+        type: string
+        default: ''
+
+jobs:
+  # ── OpenAI (translation path) ───────────────────────────────────
+  test-openai:
+    if: github.event_name == 'schedule' || inputs.run_openai != false
+    uses: ./.github/workflows/messages-openai.yml
+    with:
+      models: ${{ inputs.openai_models }}
+    secrets: inherit
+
+  # ── vLLM MaaS (native /v1/messages passthrough path) ─────────────
+  test-vllm-maas:
+    if: github.event_name == 'schedule' || inputs.run_vllm_maas != false
+    uses: ./.github/workflows/messages-vllm-maas.yml
+    with:
+      models: ${{ inputs.vllm_maas_models }}
+    secrets: inherit
