@@ -7,6 +7,7 @@ apis:
 - tool_runtime
 - vector_io
 - files
+- file_processors
 providers:
   inference:
   - provider_id: ${env.VLLM_URL:+vllm-inference}
@@ -55,12 +56,22 @@ providers:
     config:
       api_key: ${env.OPENAI_API_KEY:=}
       base_url: ${env.OPENAI_BASE_URL:=https://api.openai.com/v1}
+  - provider_id: ${env.ENABLE_GEMINI:+gemini}
+    provider_type: remote::gemini
+    config:
+      api_key: ${env.GEMINI_API_KEY:=}
+      access_token: ${env.GEMINI_ACCESS_TOKEN:=}
+      project: ${env.GEMINI_AI_PROJECT:=}
+  - provider_id: ${env.ANTHROPIC_API_KEY:+anthropic}
+    provider_type: remote::anthropic
+    config:
+      api_key: ${env.ANTHROPIC_API_KEY:=}
   vector_io:
   - provider_id: milvus
     provider_type: inline::milvus
     notes: Incompatible with multi-worker deployments
     config:
-      db_path: /opt/app-root/src/.llama/distributions/rh/milvus.db
+      db_path: /opt/app-root/src/.ogx/distributions/rh/milvus.db
       persistence:
         backend: kv_default
         namespace: vector_io::milvus
@@ -149,7 +160,7 @@ providers:
   - provider_id: meta-reference-files
     provider_type: inline::localfs
     config:
-      storage_dir: /opt/app-root/src/.llama/distributions/rh/files
+      storage_dir: /opt/app-root/src/.ogx/distributions/rh/files
       metadata_store:
         backend: sql_default
         table_name: files_metadata
@@ -165,30 +176,34 @@ providers:
       metadata_store:
         backend: sql_default
         table_name: files_metadata
+  file_processors:
+  - provider_id: pypdf
+    provider_type: inline::pypdf
+    config: {}
   batches:
   - provider_id: reference
     provider_type: inline::reference
     config:
-      kvstore:
-        namespace: batches
-        backend: kv_default
+      sqlstore:
+        table_name: batches
+        backend: sql_default
 storage:
   backends:
     kv_default:
       type: kv_postgres
       host: ${env.POSTGRES_HOST:=localhost}
       port: ${env.POSTGRES_PORT:=5432}
-      db: ${env.POSTGRES_DB:=llamastack}
-      user: ${env.POSTGRES_USER:=llamastack}
-      password: ${env.POSTGRES_PASSWORD:=llamastack}
-      table_name: ${env.POSTGRES_TABLE_NAME:=llamastack_kvstore}
+      db: ${env.POSTGRES_DB:=ogx}
+      user: ${env.POSTGRES_USER:=ogx}
+      password: ${env.POSTGRES_PASSWORD:=ogx}
+      table_name: ${env.POSTGRES_TABLE_NAME:=ogx_kvstore}
     sql_default:
       type: sql_postgres
       host: ${env.POSTGRES_HOST:=localhost}
       port: ${env.POSTGRES_PORT:=5432}
-      db: ${env.POSTGRES_DB:=llamastack}
-      user: ${env.POSTGRES_USER:=llamastack}
-      password: ${env.POSTGRES_PASSWORD:=llamastack}
+      db: ${env.POSTGRES_DB:=ogx}
+      user: ${env.POSTGRES_USER:=ogx}
+      password: ${env.POSTGRES_PASSWORD:=ogx}
   stores:
     metadata:
       backend: kv_default
@@ -204,6 +219,9 @@ storage:
     prompts:
       namespace: prompts
       backend: kv_default
+    connectors:
+      table_name: connectors
+      backend: sql_default
 registered_resources:
   models:
   - metadata:
@@ -229,7 +247,7 @@ server:
   auth:
     provider_config:
       type: ${env.AUTH_ISSUER:+oauth2_token}
-      audience: ${env.AUTH_AUDIENCE:=llama-stack}
+      audience: ${env.AUTH_AUDIENCE:=ogx}
       issuer: ${env.AUTH_ISSUER:=}
       jwks:
         uri: ${env.AUTH_JWKS_URI:=}

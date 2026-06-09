@@ -12,6 +12,7 @@ on:
     paths:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
+      - 'Containerfile'
       - 'distribution/**'
       - 'tests/**'
   push:
@@ -19,18 +20,18 @@ on:
       - main
       - rhoai-v*
 
-  # build a custom image from an arbitrary llama-stack commit
+  # build a custom image from an arbitrary ogx commit
   # NOTE: workflow_dispatch intentionally skips all tests (vllm setup, postgres setup, smoke tests, integration tests)
   # This allows building images for specific SHAs even when CI is failing on other commits,
   # useful for testing specific changes without being blocked by unrelated test failures.
   workflow_dispatch:
     inputs:
-      llama_stack_commit_sha:
-        description: 'Llama Stack commit SHA to build from - accept long and short commit SHAs'
+      ogx_commit_sha:
+        description: 'OGX commit SHA to build from - accept long and short commit SHAs'
         required: true
         type: string
 
-  # do a nightly test of the `main` branch of llama-stack at 6AM UTC every morning
+  # do a nightly test of the `main` branch of ogx at 6AM UTC every morning
   schedule:
     - cron: '0 6 * * *'
 
@@ -40,7 +41,7 @@ concurrency:
 
 env:
   REGISTRY: quay.io
-  IMAGE_NAME: quay.io/opendatahub/llama-stack # tags for the image will be added dynamically
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core # tags for the image will be added dynamically
 
 jobs:
   build-test:
@@ -61,14 +62,16 @@ jobs:
       VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
-      VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3-0.6B
-      VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.0-flash
-      OPENAI_INFERENCE_MODEL: openai/gpt-4o-mini
+      VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
+      VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
+      OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
+      GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
-      LLAMA_STACK_COMMIT_SHA: ${{ github.event.inputs.llama_stack_commit_sha || 'main' }}
+      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
     permissions:
       id-token: write # for Google Cloud authentication
       contents: read
@@ -85,12 +88,12 @@ jobs:
         run: |
           # Check if any file in the distribution directory was modified in this push
           # Use git diff instead of parsing event payload (which is unreliable for merge commits)
-          if git diff --name-only HEAD^ HEAD | grep -q '^distribution/'; then
+          if git diff --name-only HEAD^ HEAD | grep -qE '^(distribution/|Containerfile$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was modified in this push, will publish"
+            echo "distribution/ or Containerfile was modified in this push, will publish"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was not modified in this push, skipping publish"
+            echo "distribution/ and Containerfile were not modified in this push, skipping publish"
           fi
 
       - name: Install uv
@@ -100,47 +103,75 @@ jobs:
           enable-cache: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
-      - name: Generate Containerfile to build an image from an arbitrary llama-stack commit (workflow_dispatch/schedule)
+      - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch/schedule)
         if: contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
         env:
-          LLAMA_STACK_VERSION: ${{ env.LLAMA_STACK_COMMIT_SHA }}
-        run: |
-          tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/llama-stack.git "$tmp_build_dir"
-          cd "$tmp_build_dir"
-          git checkout "$LLAMA_STACK_VERSION"
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install --no-cache -e .
-          # now remove the install line from the Containerfile
-          cd -
-          python3 distribution/build.py
-          sed -i '/^RUN pip install --no-cache llama-stack==/d' distribution/Containerfile
+          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
+        run: uv run --with ruamel.yaml build/build.py
 
       - name: Build image for testing (${{ matrix.arch }})
         id: build
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: ${{ matrix.platform }}
           push: false
-          tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.LLAMA_STACK_COMMIT_SHA, github.sha) || github.sha }}
+          tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           load: true
           cache-from: type=gha,scope=build-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
 
-      - name: Unset cloud provider credentials for fork and Dependabot PRs (secrets not available)
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.repo.fork == true || github.secret_source == 'Dependabot')
+      - name: Validate provider credentials
+        env:
+          _MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
         run: |
-          echo "Unsetting cloud provider credentials for fork/Dependabot PR (secrets not available)"
-          {
-            echo "VERTEX_AI_PROJECT="
-            echo "GCP_WORKLOAD_IDENTITY_PROVIDER="
-            echo "OPENAI_API_KEY="
-          } >> "$GITHUB_ENV"
+          # Fork/Dependabot PRs: secrets are unavailable
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
+              echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
+              exit 0
+            fi
+          fi
+
+          # OpenAI: validate key with a lightweight completion call (catches over-budget / invalid)
+          if [ -n "$OPENAI_API_KEY" ]; then
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              -H "Authorization: Bearer $OPENAI_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"gpt-5-nano","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
+              https://api.openai.com/v1/chat/completions)
+            if [ "$status" != "200" ]; then
+              echo "::warning::OpenAI API returned HTTP $status, skipping OpenAI tests"
+              echo "OPENAI_API_KEY=" >> "$GITHUB_ENV"
+            fi
+          fi
+
+          # Gemini: validate key with a lightweight call
+          if [ -n "$GEMINI_API_KEY" ]; then
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY")
+            if [ "$status" != "200" ]; then
+              echo "::warning::Gemini API returned HTTP $status, skipping Gemini tests"
+              { echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
+            else
+              echo "ENABLE_GEMINI=1" >> "$GITHUB_ENV"
+            fi
+          fi
+
+          # Vertex AI: presence check (auth validated by google-github-actions/auth step)
+          if [ -z "$VERTEX_AI_PROJECT" ] || [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
+            echo "::warning::Vertex AI credentials not configured, skipping Vertex AI tests"
+            { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; } >> "$GITHUB_ENV"
+          fi
+
+          # MaaS vLLM: presence check
+          if [ -z "$_MAAS_VLLM_URL" ]; then
+            echo "::warning::MaaS vLLM URL not configured, will use local vLLM"
+          fi
 
       - name: Configure MaaS vLLM endpoints
         env:
@@ -167,7 +198,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Authenticate to Google Cloud (Vertex)
-        if: matrix.arch == 'amd64' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
+        if: matrix.arch == 'amd64' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           project_id: ${{ env.VERTEX_AI_PROJECT }}
@@ -178,7 +209,7 @@ jobs:
         id: vllm-inference
         uses: ./.github/actions/setup-vllm
         env:
-          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english
+          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
           VLLM_MODE: inference
 
       - name: Setup vLLM embedding container
@@ -186,7 +217,7 @@ jobs:
         id: vllm-embedding
         uses: ./.github/actions/setup-vllm
         env:
-          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english
+          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
           VLLM_MODE: embedding
 
       - name: Setup PostgreSQL container
@@ -213,7 +244,7 @@ jobs:
           # Create logs directory
           mkdir -p logs
 
-          docker logs llama-stack > logs/llama-stack.log 2>&1 || echo "Failed to get llama-stack logs" > logs/llama-stack.log
+          docker logs ogx > logs/ogx.log 2>&1 || echo "Failed to get ogx.logs" > logs/ogx.log
           docker logs vllm-inference > logs/vllm-inference.log 2>&1 || echo "Failed to get vllm-inference logs" > logs/vllm-inference.log
           docker logs vllm-embedding > logs/vllm-embedding.log 2>&1 || echo "Failed to get vllm-embedding logs" > logs/vllm-embedding.log
           docker logs postgres > logs/postgres.log 2>&1 || echo "Failed to get postgres logs" > logs/postgres.log
@@ -233,8 +264,8 @@ jobs:
 
           # Gather integration test logs if they exist
           echo "=== Integration test artifacts ==="
-          if [ -d "/tmp/llama-stack-integration-tests" ]; then
-            find /tmp/llama-stack-integration-tests -name "*.log" -o -name "pytest.log" -o -name "*.out" 2>/dev/null | while read -r file; do
+          if [ -d "/tmp/ogx-integration-tests" ]; then
+            find /tmp/ogx-integration-tests -name "*.log" -o -name "pytest.log" -o -name "*.out" 2>/dev/null | while read -r file; do
               cp "$file" "logs/$(basename "$file")" || true
             done
           fi
@@ -251,7 +282,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          for c in vllm-inference vllm-embedding llama-stack postgres; do
+          for c in vllm-inference vllm-embedding ogx postgres; do
             docker rm -f "$c" 2>/dev/null || true
           done
 
@@ -265,7 +296,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.LLAMA_STACK_COMMIT_SHA, github.sha) || github.sha }}
+          IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           COMMIT_SHA: ${{ github.sha }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -274,13 +305,13 @@ jobs:
 
           if [[ "${NOTIFY_FAILURE:-0}" == "1" ]]; then
             TEXT=$(printf '%s\n%s\n%s' \
-              ":failed: *Build failed for Llama Stack* - [${TIMESTAMP}]" \
+              ":failed: *Build failed for OGX* - [${TIMESTAMP}]" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")
             bash .github/actions/notify-slack/notify.sh "$TEXT" "#d00000"
           else
             TEXT=$(printf '%s\n%s\n%s\n%s' \
-              ":greenchecked: *New image is available for Llama Stack* - [${TIMESTAMP}]" \
+              ":greenchecked: *New image is available for OGX* - [${TIMESTAMP}]" \
               "Image: ${IMAGE_NAME}:${IMAGE_TAG}" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")
@@ -290,21 +321,21 @@ jobs:
       - name: Output custom build information
         if: matrix.arch == 'amd64' && contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
         env:
-          LLS_COMMIT: ${{ env.LLAMA_STACK_COMMIT_SHA }}
+          OGX_COMMIT: ${{ env.OGX_COMMIT_SHA }}
         run: |
           echo "Custom container image built successfully!"
-          echo "Image: $IMAGE_NAME:source-$LLS_COMMIT-$GITHUB_SHA"
-          echo "Llama Stack commit: $LLS_COMMIT"
+          echo "Image: $IMAGE_NAME:source-$OGX_COMMIT-$GITHUB_SHA"
+          echo "OGX commit: $OGX_COMMIT"
           echo ""
           echo "You can pull this image using:"
-          echo "docker pull $IMAGE_NAME:source-$LLS_COMMIT-$GITHUB_SHA"
+          echo "docker pull $IMAGE_NAME:source-$OGX_COMMIT-$GITHUB_SHA"
 
   publish:
     needs: build-test
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && needs.build-test.outputs.distribution-changed == 'true')
     runs-on: ubuntu-latest
     env:
-      LLAMA_STACK_COMMIT_SHA: ${{ github.event.inputs.llama_stack_commit_sha || 'main' }}
+      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
     permissions:
       contents: read
     steps:
@@ -317,44 +348,33 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Generate Containerfile to build an image from an arbitrary llama-stack commit (workflow_dispatch)
+      - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         env:
-          LLAMA_STACK_VERSION: ${{ env.LLAMA_STACK_COMMIT_SHA }}
-        run: |
-          tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/llama-stack.git "$tmp_build_dir"
-          cd "$tmp_build_dir"
-          git checkout "$LLAMA_STACK_VERSION"
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install --no-cache -e .
-          # now remove the install line from the Containerfile
-          cd -
-          python3 distribution/build.py
-          sed -i '/^RUN pip install --no-cache llama-stack==/d' distribution/Containerfile
+          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
+        run: uv run --with ruamel.yaml build/build.py
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
       - name: Log in to Quay.io
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Publish multi-arch image to Quay.io
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.LLAMA_STACK_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
+          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
           cache-from: |
             type=gha,scope=build-amd64
             type=gha,scope=build-arm64
@@ -368,7 +388,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('source-{0}-{1}', env.LLAMA_STACK_COMMIT_SHA, github.sha) || github.sha }}
+          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           COMMIT_SHA: ${{ github.sha }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -377,13 +397,13 @@ jobs:
 
           if [[ "${NOTIFY_FAILURE:-0}" == "1" ]]; then
             TEXT=$(printf '%s\n%s\n%s' \
-              ":failed: *Build failed for Llama Stack* - [${TIMESTAMP}]" \
+              ":failed: *Build failed for OGX* - [${TIMESTAMP}]" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")
             bash .github/actions/notify-slack/notify.sh "$TEXT" "#d00000"
           else
             TEXT=$(printf '%s\n%s\n%s\n%s' \
-              ":greenchecked: *New image is available for Llama Stack* - [${TIMESTAMP}]" \
+              ":greenchecked: *New image is available for OGX* - [${TIMESTAMP}]" \
               "Image: ${IMAGE_NAME}:${IMAGE_TAG}" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")

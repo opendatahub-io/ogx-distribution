@@ -1,33 +1,33 @@
 # Google AI providers walkthrough
 
-This document explains how to develop and test against Google's AI providers: [Vertex AI](https://llamastack.github.io/docs/next/providers/inference/remote_vertexai) and [Gemini](https://llamastack.github.io/docs/next/providers/inference/remote_gemini).
+This document explains how to develop and test against Google's AI providers: [Vertex AI](https://ogx-ai.github.io/docs/next/providers/inference/remote_vertexai) and [Gemini](https://ogx-ai.github.io/docs/next/providers/inference/remote_gemini).
 
-The purpose of this document is to provide lower-level debugging steps to understand and verify Vertex & Gemini behavior inside and outside of Llama Stack.
+The purpose of this document is to provide lower-level debugging steps to understand and verify Vertex & Gemini behavior inside and outside of OGX.
 
 ## Authentication with gcloud
 
-The [`gcloud` CLI](https://docs.cloud.google.com/sdk/docs/install-sdk) will write to `~/.config/gcloud` by default. Google's SDK (and Llama Stack) will also read from this location by default. You can force the SDK to read the ADC (`application_default_credentials.json`) from another path with `$GOOGLE_APPLICATION_CREDENTIALS`.
+The [`gcloud` CLI](https://docs.cloud.google.com/sdk/docs/install-sdk) will write to `~/.config/gcloud` by default. Google's SDK (and OGX) will also read from this location by default. You can force the SDK to read the ADC (`application_default_credentials.json`) from another path with `$GOOGLE_APPLICATION_CREDENTIALS`.
 
-For this demo, we will write LLS's credentials to a *temporary location*, using the `CLOUDSDK_CONFIG` variable. This will avoid clobbering any existing login settings in `~/.config/gcloud` so that you do not disrupt other Vertex-enabled applications you might have on your computer (like Claude Code).
+For this demo, we will write OGX's credentials to a *temporary location*, using the `CLOUDSDK_CONFIG` variable. This will avoid clobbering any existing login settings in `~/.config/gcloud` so that you do not disrupt other Vertex-enabled applications you might have on your computer (like Claude Code).
 
 ```bash
 export CLOUDSDK_CONFIG="/tmp/gcloud"
 
-# When prompted, "Enter a project ID". For ODH LLS core developers, type "aaet-dev".
+# When prompted, "Enter a project ID". For ODH OGX core developers, type "aaet-dev".
 gcloud init
 
 # Create application_default_credentials.json (ADC) for Vertex AI:
 gcloud auth application-default login
 ```
 
-## Vertex OpenAI API example without Llama Stack
+## Vertex OpenAI API example without OGX
 
-To make a simple OpenAI chat completion request (apart from Llama Stack):
+To make a simple OpenAI chat completion request (apart from OGX):
 
 ```bash
 export CLOUDSDK_CONFIG="/tmp/gcloud"
 
-# Choose "aaet-dev" if you are on the core LLS team.
+# Choose "aaet-dev" if you are on the core OGX team.
 VERTEX_AI_PROJECT=aaet-dev
 
 curl -X POST \
@@ -35,7 +35,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   "https://aiplatform.googleapis.com/v1beta1/projects/${VERTEX_AI_PROJECT}/locations/global/endpoints/openapi/chat/completions" \
   -d '{
-        "model": "google/gemini-2.5-flash",
+        "model": "google/gemini-3.5-flash",
         "messages": [
           {
             "role": "system",
@@ -51,39 +51,39 @@ curl -X POST \
       }'
 ```
 
-## Llama Stack from Git example
+## OGX from Git example
 
-Run the `starter` distribution from Git. When you set `VERTEX_AI_PROJECT`, LLS will activate the `vertexai` provider.
+Run the `starter` distribution from Git. When you set `VERTEX_AI_PROJECT`, OGX will activate the `vertexai` provider.
 
 ```bash
 uv venv
 . .venv/bin/activate
 uv pip install -e .
 # See https://github.com/llamastack/llama-stack/issues/4672 for improving this:
-llama stack list-deps starter | xargs -L1 uv pip install
+ogx stack list-deps starter | xargs -L1 uv pip install
 
-# Choose "aaet-dev" if you are on the core LLS team.
+# Choose "aaet-dev" if you are on the core OGX team.
 export VERTEX_AI_PROJECT=aaet-dev
 export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcloud/application_default_credentials.json
-llama stack run starter
+ogx run starter
 ```
 
-## Vertex OpenAI API examples with Llama Stack
+## Vertex OpenAI API examples with OGX
 
-Verify that LLS reports the `vertexai` provider's `google` models as available:
+Verify that OGX reports the `vertexai` provider's `google` models as available:
 
 ```bash
 curl -H "Content-Type: application/json" "http://localhost:8321/v1/models" | jq
 ```
 
-Make a chat completion request through LLS to Google Vertex:
+Make a chat completion request through OGX to Google Vertex:
 
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
   "http://localhost:8321/v1/chat/completions" \
   -d '{
-        "model": "vertexai/google/gemini-2.5-flash",
+        "model": "vertexai/google/gemini-3.5-flash",
         "messages": [
           {
             "role": "system",
@@ -101,13 +101,49 @@ curl -X POST \
 
 ## Gemini examples
 
-Llama Stack has both a ["Gemini"](https://llamastack.github.io/docs/next/providers/inference/remote_gemini) and "Vertex AI" provider. They are completely different APIs. The Gemini provider uses the `GEMINI_API_KEY` env var.
+OGX has both a ["Gemini"](https://ogx-ai.github.io/docs/next/providers/inference/remote_gemini) and "Vertex AI" provider. They are completely different APIs.
 
-There are multiple ways to acquire a Gemini API key. Many developers acquire a key with [Google's web UI](https://ai.google.dev/gemini-api/docs/api-key). In this walkthrough, we will use the `gcloud` CLI with single-sign-on to acquire a short-lived OAuth access token (and assign it to `GEMINI_API_KEY`).
+The Gemini provider is enabled by setting `ENABLE_GEMINI=1`. It supports two authentication methods (`GEMINI_API_KEY` or `GEMINI_ACCESS_TOKEN` + `GEMINI_AI_PROJECT`, but not both):
+
+| Method | Env vars | Use case |
+|---|---|---|
+| **API key** | `ENABLE_GEMINI` + `GEMINI_API_KEY` | Keys from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key). Sent as an `x-goog-api-key` header. |
+| **OAuth/ADC** | `ENABLE_GEMINI` + `GEMINI_ACCESS_TOKEN` + `GEMINI_AI_PROJECT` | Short-lived tokens from `gcloud` SSO. Sent as `Authorization: Bearer` header. |
+
+### Running Gemini with OGX
+
+**API key path** — acquire a key from [Google AI Studio](https://ai.google.dev/gemini-api/docs/api-key):
+
+```bash
+export ENABLE_GEMINI=1
+export GEMINI_API_KEY=<your-api-key>
+```
+
+**OAuth/ADC path** — use `gcloud` SSO to get a short-lived access token:
+
+```bash
+export CLOUDSDK_CONFIG="/tmp/gcloud"
+
+gcloud auth application-default login --scopes='https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/generative-language.retriever'
+
+export ENABLE_GEMINI=1
+export GEMINI_ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
+# Choose "aaet-dev" if you are on the core OGX team.
+export GEMINI_AI_PROJECT=aaet-dev
+```
+
+With either method, start OGX and verify Gemini models are available:
+
+```bash
+ogx stack run starter
+curl -s http://localhost:8321/v1/models | jq '.data[].id' | grep gemini
+```
 
 ### Testing Gemini REST API with curl
 
-Again, use the temporary location for Google auth:
+For lower-level debugging outside of OGX, you can call the Gemini REST API directly.
+
+Use the temporary location for Google auth:
 
 ```bash
 export CLOUDSDK_CONFIG="/tmp/gcloud"
@@ -119,21 +155,21 @@ Retrieve an Application Default Credential (ADC) that has the `generative-langua
 gcloud auth application-default login --scopes='https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/generative-language.retriever'
 ```
 
-Obtain a short-lived OAuth access token from this ADC and assign it to `GEMINI_API_KEY`:
+Obtain a short-lived OAuth access token:
 
 ```bash
-GEMINI_API_KEY=$(gcloud auth application-default print-access-token)
+GEMINI_ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
 ```
 
 Making a chat request:
 
 ```bash
-# Choose "aaet-dev" if you are on the core LLS team.
+# Choose "aaet-dev" if you are on the core OGX team.
 GEMINI_AI_PROJECT=aaet-dev
 
-curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" \
+curl "https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent" \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $GEMINI_API_KEY" \
+  -H "Authorization: Bearer $GEMINI_ACCESS_TOKEN" \
   -H "x-goog-user-project: $GEMINI_AI_PROJECT" \
   -X POST -d '{
     "contents": [
@@ -153,7 +189,7 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:g
 For troubleshooting, verify the oauth scopes for your access token, like so:
 
 ```bash
-$ curl https://oauth2.googleapis.com/tokeninfo?access_token=$GEMINI_API_KEY
+$ curl https://oauth2.googleapis.com/tokeninfo?access_token=$GEMINI_ACCESS_TOKEN
 {
   "azp": "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com",
   "aud": "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com",

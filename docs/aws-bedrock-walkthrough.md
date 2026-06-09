@@ -1,6 +1,6 @@
 # AWS Bedrock walkthrough guide
 
-*Note: This walkthrough does not use Llama Stack. It explains how to use AWS Bedrock’s REST API directly with `curl`, using your own Bearer token. [Llama Stack’s Bedrock provider](https://llama-stack.readthedocs.io/en/latest/providers/inference/remote_bedrock.html) will abstract most of these steps away. The purpose of this document is to provide lower-level debugging steps to understand and verify behavior outside of Llama Stack. For example, sometimes Amazon does not make Bedrock features available in all regions.*
+*Note: This walkthrough does not use OGX. It explains how to use AWS Bedrock’s REST API directly with `curl`, using your own Bearer token. [OGX’s Bedrock provider](https://ogx-ai.github.io/en/latest/providers/inference/remote_bedrock.html) will abstract most of these steps away. The purpose of this document is to provide lower-level debugging steps to understand and verify behavior outside of OGX. For example, sometimes Amazon does not make Bedrock features available in all regions.*
 
 1. Log into the AWS web console ([Red Hat-only SSO link](https://auth.redhat.com/auth/realms/EmployeeIDP/protocol/saml/clients/itaws))
 2. Go to [https://console.aws.amazon.com/bedrock/](https://console.aws.amazon.com/bedrock/)
@@ -35,7 +35,7 @@ curl -X POST https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1/chat/comp
 
 # AWS Bedrock's own API
 
-Llama Stack does [not](https://github.com/llamastack/llama-stack/pull/3748) use this API. (`boto3` does, [docs](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-meta.html).)
+OGX does [not](https://github.com/llamastack/llama-stack/pull/3748) use this API. (`boto3` does, [docs](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-meta.html).)
 
 You can use your bearer token with AWS Bedrock's proprietary `/converse` API ([doc](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-use.html)).
 (The region in this URL must match the region where you generated the Bearer token above.)

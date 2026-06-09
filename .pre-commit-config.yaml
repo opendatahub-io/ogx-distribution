@@ -1,5 +1,3 @@
-exclude: 'build/'
-
 default_language_version:
     python: python3.12
 
@@ -19,7 +17,6 @@ repos:
     -   id: check-yaml
         args: ["--unsafe"]
     -   id: detect-private-key
-    -   id: requirements-txt-fixer
     -   id: mixed-line-ending
         args: [--fix=lf] # Forces to replace line ending by LF (line feed)
     -   id: check-executables-have-shebangs
@@ -40,8 +37,8 @@ repos:
     hooks:
       - id: actionlint
 
--   repo: https://github.com/koalaman/shellcheck-precommit
-    rev: v0.11.0
+-   repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
     hooks:
     -   id: shellcheck
 
@@ -49,22 +46,21 @@ repos:
     hooks:
       - id: pkg-gen
         name: Distribution Build
-        entry: ./distribution/build.py
+        entry: ./build/build.py
         language: python
         pass_filenames: false
         require_serial: true
         always_run: true
-        files: ^distribution/.*$
         additional_dependencies:
           - uv>=0.9.0
           - ruamel.yaml>=0.18.0
 
       - id: doc-gen
         name: Distribution Documentation
-        entry: ./scripts/gen_distro_docs.py
+        entry: ./build/gen_distro_docs.py
         language: python
         pass_filenames: false
         require_serial: true
-        files: ^distribution/(build|config)\.yaml$
+        files: ^(build/(build\.yaml|build\.env)|distribution/config\.yaml)$
         additional_dependencies:
           - pyyaml==6.0.2

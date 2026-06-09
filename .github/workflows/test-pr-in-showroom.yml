@@ -64,21 +64,21 @@ jobs:
         with:
           repository: ${{ steps.pr-info.outputs.repo }}
           ref: ${{ steps.pr-info.outputs.sha }}
-          path: llama-stack-distribution
+          path: ogx-distribution
           persist-credentials: false
 
       - name: Checkout pushed code
         if: inputs.pr_number == ''
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          path: llama-stack-distribution
+          path: ogx-distribution
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
 
       - name: Build image
         id: build
-        working-directory: llama-stack-distribution
+        working-directory: ogx-distribution
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
           PR_SHA: ${{ steps.pr-info.outputs.sha }}
@@ -99,19 +99,20 @@ jobs:
             TAG="push-${SHORT_SHA}"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Building image: llama-stack-test:$TAG"
+          echo "Building image: ogx-test:$TAG"
 
           uv venv
           source .venv/bin/activate
-          python3 distribution/build.py
-          podman build -f distribution/Containerfile -t "llama-stack-test:$TAG" .
+          uv pip install 'ruamel.yaml>=0.18.0'
+          python3 build/build.py
+          podman build -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Setup CI environment
         id: setup
-        uses: derekhiggins/llama-stack-showroom@fad3dfe273d55357107929e36eb031706456fe88  # main as of 2026-04-23
+        uses: derekhiggins/llama-stack-showroom@f32973c9b7389b14d1988b55abfe74dd98c2432f  # main as of 2026-06-05
         with:
           catalog_image: ${{ inputs.catalog_image }}
-          llama_stack_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/llama-stack-test:${{ steps.build.outputs.tag }}"
+          llama_stack_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
           operator_image: ${{ inputs.operator_image }}
           oc_server: ${{ secrets.OC_SERVER }}
           oc_token: ${{ secrets.OC_TOKEN }}
@@ -128,12 +129,12 @@ jobs:
         run: |
           # Push image to registry
           "${{ steps.setup.outputs.scripts_dir }}/push-image-to-registry.sh" \
-            llama-stack-test:${{ steps.build.outputs.tag }} \
+            ogx-test:${{ steps.build.outputs.tag }} \
             redhat-ods-operator \
-            llama-stack-test:${{ steps.build.outputs.tag }}
+            ogx-test:${{ steps.build.outputs.tag }}
 
           # Construct pull URL for cluster-internal access
-          PULL_IMAGE="image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/llama-stack-test:${{ steps.build.outputs.tag }}"
+          PULL_IMAGE="image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
 
           echo "pull_image=${PULL_IMAGE}" >> "$GITHUB_OUTPUT"
 
@@ -161,10 +162,10 @@ jobs:
           oc get all -n redhat-ods-applications
 
           echo -e "\n=== Pod Logs (first 5 lines) ==="
-          oc logs -n redhat-ods-applications -l app=llama-stack --tail=-1 | head -5 || echo "No logs available"
+          oc logs -n redhat-ods-applications -l app=ogx --tail=-1 | head -5 || echo "No logs available"
 
           echo -e "\n=== Pod Logs (last 150 lines) ==="
-          oc logs -n redhat-ods-applications --tail=150 -l app=llama-stack || echo "No logs available"
+          oc logs -n redhat-ods-applications --tail=150 -l app=ogx || echo "No logs available"
 
       - name: Run unprovision.sh
         if: always()

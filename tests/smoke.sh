@@ -7,9 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/test_utils.sh"
 
-LLAMA_STACK_BASE_URL="http://127.0.0.1:8321"
+OGX_BASE_URL="http://127.0.0.1:8321"
 
-function start_and_wait_for_llama_stack_container {
+function start_and_wait_for_ogx_container {
   # Build docker run command with base arguments
   docker_args=(
     -d
@@ -21,9 +21,9 @@ function start_and_wait_for_llama_stack_container {
     --env "VLLM_EMBEDDING_URL=$VLLM_EMBEDDING_URL"
     --env "POSTGRES_HOST=${POSTGRES_HOST:-localhost}"
     --env "POSTGRES_PORT=${POSTGRES_PORT:-5432}"
-    --env "POSTGRES_DB=${POSTGRES_DB:-llamastack}"
-    --env "POSTGRES_USER=${POSTGRES_USER:-llamastack}"
-    --env "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-llamastack}"
+    --env "POSTGRES_DB=${POSTGRES_DB:-ogx}"
+    --env "POSTGRES_USER=${POSTGRES_USER:-ogx}"
+    --env "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ogx}"
   )
 
   # Conditionally add vLLM API token (needed for MaaS)
@@ -47,6 +47,7 @@ function start_and_wait_for_llama_stack_container {
   if [ -n "${VERTEX_AI_PROJECT:-}" ] && [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     docker_args+=(
       --env "VERTEX_AI_PROJECT=$VERTEX_AI_PROJECT"
+      --env "VERTEX_AI_LOCATION=${VERTEX_AI_LOCATION:-global}"
       --env "GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp-credentials"
       --volume "$GOOGLE_APPLICATION_CREDENTIALS:/run/secrets/gcp-credentials:ro"
     )
@@ -57,26 +58,34 @@ function start_and_wait_for_llama_stack_container {
     docker_args+=(--env "OPENAI_API_KEY=$OPENAI_API_KEY")
   fi
 
-  docker_args+=(--name llama-stack "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
+  # Only add Gemini configuration if GEMINI_API_KEY is set
+  if [ -n "${GEMINI_API_KEY:-}" ]; then
+    docker_args+=(
+      --env "ENABLE_GEMINI=1"
+      --env "GEMINI_API_KEY=$GEMINI_API_KEY"
+    )
+  fi
 
-  # Start llama stack
+  docker_args+=(--name ogx "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
+
+  # Start ogx
   docker run "${docker_args[@]}"
-  echo "Started Llama Stack container..."
+  echo "Started OGX container..."
 
-  # Wait for llama stack to be ready by doing a health check
-  echo "Waiting for Llama Stack server..."
+  # Wait for ogx to be ready by doing a health check
+  echo "Waiting for OGX server..."
   for i in {1..60}; do
-    echo "Attempt $i to connect to Llama Stack..."
-    resp=$(curl -fsS $LLAMA_STACK_BASE_URL/v1/health)
+    echo "Attempt $i to connect to OGX..."
+    resp=$(curl -fsS $OGX_BASE_URL/v1/health)
     if [ "$resp" == '{"status":"OK"}' ]; then
-      echo "Llama Stack server is up!"
+      echo "OGX server is up!"
       return
     fi
     sleep 1
   done
-  echo "Llama Stack server failed to start :("
+  echo "OGX server failed to start :("
   echo "Container logs:"
-  docker logs llama-stack || true
+  docker logs ogx || true
   exit 1
 }
 
@@ -84,7 +93,7 @@ function test_model_list {
   validate_model_parameter "$1"
   local model="$1"
   echo "===> Looking for model $model..."
-  resp=$(curl -fsS $LLAMA_STACK_BASE_URL/v1/models)
+  resp=$(curl -fsS $OGX_BASE_URL/v1/models)
   echo "Response: $resp"
   if echo "$resp" | grep -q "$model"; then
     echo "Model $model was found :)"
@@ -92,7 +101,7 @@ function test_model_list {
     echo "Model $model was not found :("
     echo "Response: $resp"
     echo "Container logs:"
-    docker logs llama-stack || true
+    docker logs ogx || true
     return 1
   fi
   return 0
@@ -102,7 +111,7 @@ function test_model_openai_inference {
   validate_model_parameter "$1"
   local model="$1"
   echo "===> Attempting to chat with model $model..."
-  resp=$(curl -fsS $LLAMA_STACK_BASE_URL/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\": \"$model\",\"messages\": [{\"role\": \"user\", \"content\": \"What color is grass?\"}], \"max_tokens\": 128, \"temperature\": 0.0}")
+  resp=$(curl -fsS $OGX_BASE_URL/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\": \"$model\",\"messages\": [{\"role\": \"user\", \"content\": \"What color is grass?\"}], \"max_tokens\": 128, \"temperature\": 0.0}")
   if echo "$resp" | grep -q "green"; then
     echo "===> Inference is working :)"
     return 0
@@ -110,7 +119,7 @@ function test_model_openai_inference {
     echo "===> Inference is not working :("
     echo "Response: $resp"
     echo "Container logs:"
-    docker logs llama-stack || true
+    docker logs ogx || true
     return 1
   fi
 }
@@ -118,12 +127,12 @@ function test_model_openai_inference {
 function test_postgres_tables_exist {
   echo "===> Verifying PostgreSQL tables have been created..."
 
-  # Expected tables created by llama-stack
-  expected_tables=("llamastack_kvstore" "inference_store")
+  # Expected tables created by ogx
+  expected_tables=("ogx_kvstore" "inference_store")
 
   # Retry for up to 10 seconds for tables to be created
   for i in {1..10}; do
-    tables=$(docker exec postgres psql -U llamastack -d llamastack -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';" 2>/dev/null | tr -d ' ' | tr '\n' ' ')
+    tables=$(docker exec postgres psql -U ogx -d ogx -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';" 2>/dev/null | tr -d ' ' | tr '\n' ' ')
     all_found=true
     for table in "${expected_tables[@]}"; do
       if ! echo "$tables" | grep -q "$table"; then
@@ -143,7 +152,7 @@ function test_postgres_tables_exist {
   echo "===> PostgreSQL tables not created after 10s :("
   echo "Expected tables: ${expected_tables[*]}"
   echo "Available tables: $tables"
-  docker exec postgres psql -U llamastack -d llamastack -c "\dt" || true
+  docker exec postgres psql -U ogx -d ogx -c "\dt" || true
   return 1
 }
 
@@ -153,7 +162,7 @@ function test_postgres_populated {
   # Check that chat_completions table has data (retry for up to 10 seconds)
   echo "Waiting for inference_store table to be populated..."
   for i in {1..10}; do
-    inference_count=$(docker exec postgres psql -U llamastack -d llamastack -t -c "SELECT COUNT(*) FROM inference_store;" 2>/dev/null | tr -d ' ')
+    inference_count=$(docker exec postgres psql -U ogx -d ogx -t -c "SELECT COUNT(*) FROM inference_store;" 2>/dev/null | tr -d ' ')
     if [ -n "$inference_count" ] && [ "$inference_count" -gt 0 ]; then
       echo "===> inference_store table has $inference_count record(s)"
       break
@@ -164,9 +173,9 @@ function test_postgres_populated {
   if [ -z "$inference_count" ] || [ "$inference_count" -eq 0 ]; then
     echo "===> PostgreSQL inference_store table is empty or doesn't exist after 10s :("
     echo "Tables in database:"
-    docker exec postgres psql -U llamastack -d llamastack -c "\dt" || true
+    docker exec postgres psql -U ogx -d ogx -c "\dt" || true
     echo "inference_store table contents:"
-    docker exec postgres psql -U llamastack -d llamastack -t -c "SELECT COUNT(*) FROM inference_store;" || true
+    docker exec postgres psql -U ogx -d ogx -t -c "SELECT COUNT(*) FROM inference_store;" || true
     return 1
   fi
 
@@ -174,9 +183,39 @@ function test_postgres_populated {
   return 0
 }
 
+function test_file_processor_pypdf {
+  echo "===> Verifying file processor (inline::pypdf) with sample PDF..."
+
+  # Must match text embedded in tests/fixtures/sample.pdf (not guessable by an LLM).
+  local expected_marker="OGX-RAG-SMOKE-7f3a9c2e8b1d4f06"
+  local pdf_path="$SCRIPT_DIR/fixtures/sample.pdf"
+  if [ ! -f "$pdf_path" ]; then
+    echo "===> Sample PDF not found at $pdf_path :("
+    return 1
+  fi
+
+  resp=$(curl -fsS "$OGX_BASE_URL/v1alpha/file-processors/process" -F "file=@$pdf_path;type=application/pdf")
+  echo "Response: $resp"
+
+  if ! echo "$resp" | grep -q '"processor"[[:space:]]*:[[:space:]]*"pypdf"'; then
+    echo "===> File processor response missing pypdf metadata :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+
+  if ! echo "$resp" | grep -qF "$expected_marker"; then
+    echo "===> File processor did not extract expected PDF marker ($expected_marker) :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+
+  echo "===> File processor (inline::pypdf) is working :)"
+  return 0
+}
+
 main() {
   echo "===> Starting smoke test..."
-  start_and_wait_for_llama_stack_container
+  start_and_wait_for_ogx_container
 
   # Track failures
   failed_checks=()
@@ -211,6 +250,15 @@ main() {
       echo "===> OPENAI_API_KEY is not set, skipping OpenAI models"
     fi
 
+    # Only include Gemini models if GEMINI_API_KEY is set
+    if [ -n "${GEMINI_API_KEY:-}" ]; then
+      echo "===> GEMINI_API_KEY is set, including Gemini models in tests"
+      models_to_test+=("$GEMINI_INFERENCE_MODEL")
+      inference_models_to_test+=("$GEMINI_INFERENCE_MODEL")
+    else
+      echo "===> GEMINI_API_KEY is not set, skipping Gemini models"
+    fi
+
     echo "===> Testing model list for all models..."
     for model in "${models_to_test[@]}"; do
       if ! test_model_list "$model"; then
@@ -232,6 +280,10 @@ main() {
     if ! test_postgres_populated; then
       failed_checks+=("postgres:data")
     fi
+  fi
+
+  if ! test_file_processor_pypdf; then
+    failed_checks+=("file_processor:pypdf")
   fi
 
   # Report results

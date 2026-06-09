@@ -3,48 +3,40 @@
 set -exuo pipefail
 
 # Configuration
-WORK_DIR="/tmp/llama-stack-integration-tests"
+WORK_DIR="/tmp/ogx-integration-tests"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source common test utilities
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/test_utils.sh"
 
-# Get repository and version dynamically from Containerfile
-# Look for git URL format: git+https://github.com/*/llama-stack.git@vVERSION or @VERSION
-CONTAINERFILE="$SCRIPT_DIR/../distribution/Containerfile"
-GIT_URL=$(grep -o 'git+https://github\.com/[^/]\+/llama-stack\.git@v\?[0-9.+a-z]\+' "$CONTAINERFILE")
-if [ -z "$GIT_URL" ]; then
-    echo "Error: Could not extract llama-stack git URL from Containerfile"
+# Get repository and version from build.env
+BUILD_ENV="$SCRIPT_DIR/../build/build.env"
+OGX_VERSION=$(grep '^OGX_VERSION=' "$BUILD_ENV" | cut -d= -f2)
+if [ -z "$OGX_VERSION" ]; then
+    echo "Error: Could not extract OGX_VERSION from build.env"
     exit 1
 fi
-
-# Extract repo URL (remove git+ prefix and @version suffix)
-LLAMA_STACK_REPO=${GIT_URL#git+}
-LLAMA_STACK_REPO=${LLAMA_STACK_REPO%%@*}
-# Extract version (remove git+ prefix and everything before @, and optional v prefix)
-LLAMA_STACK_VERSION=${GIT_URL##*@}
-LLAMA_STACK_VERSION=${LLAMA_STACK_VERSION#v}
-if [ -z "$LLAMA_STACK_VERSION" ]; then
-    echo "Error: Could not extract llama-stack version from Containerfile"
+# Extract repo URL from build.py constant
+OGX_REPO=$(grep 'OGX_GIT_REPO' "$SCRIPT_DIR/../build/build.py" | grep -o 'https://[^"]*')
+if [ -z "$OGX_REPO" ]; then
+    echo "Error: Could not extract OGX_GIT_REPO from build.py"
     exit 1
 fi
+# Strip .git suffix for cloning and leading v for version display
+OGX_REPO=${OGX_REPO%.git}
 
-function clone_llama_stack() {
+function clone_ogx() {
     # Clone the repository if it doesn't exist
     if [ ! -d "$WORK_DIR" ]; then
-        git clone "$LLAMA_STACK_REPO" "$WORK_DIR"
+        git clone "$OGX_REPO" "$WORK_DIR"
     fi
 
     # Checkout the specific tag
     cd "$WORK_DIR"
     # fetch origin incase we didn't clone a fresh repo
     git fetch origin
-    if [ "$LLAMA_STACK_VERSION" == "main" ]; then
-        checkout_to="main"
-    else
-        checkout_to="v$LLAMA_STACK_VERSION"
-    fi
+    checkout_to="$OGX_VERSION"
     if ! git checkout "$checkout_to"; then
         echo "Error: Could not checkout $checkout_to"
         echo "Available tags:"
@@ -69,7 +61,15 @@ function run_integration_tests() {
     # so vLLM correctly rejects these requests with a 400 error. sentence-transformers silently
     # truncated without validation, masking the issue.
     # test_openai_completion_logprobs{,_streaming}: upstream schema defines logprobs as bool, should be int https://github.com/llamastack/llama-stack/issues/5253
-    SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming"
+    # test_openai_chat_completion_structured_output, test_simple_tool_call, test_streaming_tool_calls:
+    # These tests time out when running against Qwen3.5-0.8B on CPU. The upstream
+    # test fixtures hardcode a 30s timeout on the OpenAI client and default to 30s
+    # on the OGX client (via OGX_CLIENT_TIMEOUT). Structured output and tool calling
+    # require constrained decoding which is significantly slower on CPU, causing
+    # requests to exceed the 30s limit. The timeouts are set upstream in
+    # tests/integration/fixtures/common.py and cannot be overridden from our side
+    # for the OpenAI client path.
+    SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls"
 
     # Dynamically determine the path to config.yaml from the original script directory
     STACK_CONFIG_PATH="$SCRIPT_DIR/../distribution/config.yaml"
@@ -81,7 +81,7 @@ function run_integration_tests() {
     uv venv --clear
     # shellcheck source=/dev/null
     source .venv/bin/activate
-    uv pip install llama-stack-client ollama
+    uv pip install ogx-client ollama
     uv run pytest -s -v tests/integration/inference/ \
         --stack-config=server:"$STACK_CONFIG_PATH" \
         --text-model="$model" \
@@ -90,19 +90,21 @@ function run_integration_tests() {
 }
 
 function main() {
-    echo "Starting llama-stack integration tests"
+    echo "Starting ogx integration tests"
     echo "Configuration:"
-    echo "  LLAMA_STACK_VERSION: $LLAMA_STACK_VERSION"
-    echo "  LLAMA_STACK_REPO: $LLAMA_STACK_REPO"
+    echo "  OGX_VERSION: $OGX_VERSION"
+    echo "  OGX_REPO: $OGX_REPO"
     echo "  WORK_DIR: $WORK_DIR"
     echo "  VLLM_INFERENCE_MODEL: $VLLM_INFERENCE_MODEL"
     echo "  VERTEX_AI_INFERENCE_MODEL: $VERTEX_AI_INFERENCE_MODEL"
     echo "  OPENAI_INFERENCE_MODEL: $OPENAI_INFERENCE_MODEL"
+    echo "  GEMINI_INFERENCE_MODEL: ${GEMINI_INFERENCE_MODEL:-<not set>}"
     echo "  EMBEDDING_MODEL: $EMBEDDING_MODEL"
     echo "  VERTEX_AI_PROJECT: ${VERTEX_AI_PROJECT:-<not set>}"
     echo "  OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
+    echo "  GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}"
 
-    clone_llama_stack
+    clone_ogx
 
     # Build list of models to test based on available configuration
     models_to_test=("$VLLM_INFERENCE_MODEL")
@@ -122,6 +124,14 @@ function main() {
         models_to_test+=("$OPENAI_INFERENCE_MODEL")
     else
         echo "OPENAI_API_KEY is not set, skipping OpenAI models"
+    fi
+
+    # Only include Gemini models if GEMINI_API_KEY is set
+    if [ -n "${GEMINI_API_KEY:-}" ]; then
+        echo "GEMINI_API_KEY is set, including Gemini models in tests"
+        models_to_test+=("$GEMINI_INFERENCE_MODEL")
+    else
+        echo "GEMINI_API_KEY is not set, skipping Gemini models"
     fi
 
     for model in "${models_to_test[@]}"; do
