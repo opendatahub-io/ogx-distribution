@@ -139,11 +139,11 @@ function test_messages_basic {
   if echo "$resp" | python3 -c '
 import json, sys
 data = json.load(sys.stdin)
-assert data.get("type") == "message", f"type={data.get(\"type\")!r}"
-assert data.get("role") == "assistant", f"role={data.get(\"role\")!r}"
+assert data.get("type") == "message", "type=" + repr(data.get("type"))
+assert data.get("role") == "assistant", "role=" + repr(data.get("role"))
 content = data.get("content") or []
 text_blocks = [b for b in content if b.get("type") == "text" and b.get("text")]
-assert text_blocks, f"no non-empty text blocks: {content}"
+assert text_blocks, "no non-empty text blocks: " + repr(content)
 '; then
     echo "===> Messages API is working :)"
     return 0

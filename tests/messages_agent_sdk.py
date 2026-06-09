@@ -57,7 +57,9 @@ async def run_session() -> None:
         print("===> MESSAGES_AGENT_MODEL is not set")
         sys.exit(1)
 
-    print(f"===> Starting Claude Agent SDK session (base_url={base_url}, model={model})...")
+    print(
+        f"===> Starting Claude Agent SDK session (base_url={base_url}, model={model})..."
+    )
 
     options = ClaudeAgentOptions(
         model=model,
