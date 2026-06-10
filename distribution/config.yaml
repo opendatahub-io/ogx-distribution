@@ -2,9 +2,13 @@
 # by build/build.py - do not edit manually.
 #
 # Stripped provider types (dependency only - available via custom config.yaml):
+#   - inline::docling
 #   - inline::faiss
+#   - inline::markitdown
 #   - inline::milvus
+#   - inline::pypdf
 #   - inline::sentence-transformers
+#   - remote::docling-serve
 version: 2
 image_name: rh
 apis:
@@ -170,20 +174,6 @@ providers:
   - provider_id: auto
     provider_type: inline::auto
     config: {}
-  - provider_id: docling
-    provider_type: inline::docling
-    config: {}
-  - provider_id: markitdown
-    provider_type: inline::markitdown
-    config: {}
-  - provider_id: pypdf
-    provider_type: inline::pypdf
-    config: {}
-  - provider_id: ${env.DOCLING_SERVE_URL:+docling-serve}
-    provider_type: remote::docling-serve
-    config:
-      base_url: ${env.DOCLING_SERVE_URL:=}
-      api_key: ${env.DOCLING_SERVE_API_KEY:=}
   batches:
   - provider_id: reference
     provider_type: inline::reference

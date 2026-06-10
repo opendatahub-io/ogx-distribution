@@ -12,10 +12,10 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 |-----|----------|-----------|---------------------|---------------|
 | batches | inline::reference | No | ✅ | N/A |
 | file_processors | inline::auto | No | ✅ | N/A |
-| file_processors | inline::docling | No | ✅ | N/A |
-| file_processors | inline::markitdown | No | ✅ | N/A |
-| file_processors | inline::pypdf | No | ✅ | N/A |
-| file_processors | remote::docling-serve | No | ❌ | Set the `DOCLING_SERVE_URL` environment variable |
+| file_processors | inline::docling | No | Dependency only* | Requires a custom `config.yaml` |
+| file_processors | inline::markitdown | No | Dependency only* | Requires a custom `config.yaml` |
+| file_processors | inline::pypdf | No | Dependency only* | Requires a custom `config.yaml` |
+| file_processors | remote::docling-serve | No | Dependency only* | Requires a custom `config.yaml` |
 | files | inline::localfs | No | ✅ | N/A |
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |
