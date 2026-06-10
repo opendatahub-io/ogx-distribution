@@ -20,13 +20,13 @@ The full matrix is defined in **`config/providers-matrix.yaml`** (derived from [
 
    ```bash
    export BASE_URL="http://localhost:8321"
-   export MODEL="your-model-name"                    # required for inference tests
+   export INFERENCE_MODEL="your-model-name"                    # required for inference tests
    export FILES_PROVIDER="remote::s3"                 # optional, for reporting
    export INFERENCE_PROVIDER="remote::azure"         # optional
    export VECTOR_IO_PROVIDER="remote::pgvector"      # optional
    ```
 
-   **Model** is required: every inference provider (vLLM, Azure, Bedrock, etc.) is tested with this model name.
+   **INFERENCE_MODEL** is required: every inference provider (vLLM, Azure, Bedrock, etc.) is tested with this model name.
 
 3. **Run the full test run** (Bruno files + all Bruno collections + notebooks):
 
@@ -50,14 +50,14 @@ The full matrix is defined in **`config/providers-matrix.yaml`** (derived from [
 
 Bruno and notebooks share one parameter set:
 
-- **Bruno:** gets `base_url`, `model`, and provider vars via `--env-var` from the script.
-- **Notebooks:** the script exports the same env vars; the module `config/notebook_env` uses `os.environ.get` for each. In a notebook: `from config.notebook_env import base_url, model, inference_provider, files_provider, vector_io_provider`. See **`notebooks/README.md`** for path setup.
+- **Bruno:** gets `base_url`, `inference_model`, and provider vars via `--env-var` from the script.
+- **Notebooks:** the script exports the same env vars; the module `config/notebook_env` uses `os.environ.get` for each. In a notebook: `from config.notebook_env import base_url, model, embedding_model, inference_provider, files_provider, vector_io_provider`. See **`notebooks/README.md`** for path setup.
 
 ## Example: S3 + Azure + pgvector
 
 ```bash
 export BASE_URL="https://my-ogx.example.com"
-export MODEL="gpt-4o"
+export INFERENCE_MODEL="gpt-4o"
 export FILES_PROVIDER="remote::s3"
 export INFERENCE_PROVIDER="remote::azure"
 export VECTOR_IO_PROVIDER="remote::pgvector"
@@ -66,9 +66,9 @@ export VECTOR_IO_PROVIDER="remote::pgvector"
 
 ## CI / matrix runs
 
-To test multiple combinations, call the script in a loop (or use a matrix in GitHub Actions) over `FILES_PROVIDER`, `INFERENCE_PROVIDER`, and `VECTOR_IO_PROVIDER`, with a single `MODEL` (or model per inference provider) and the same `BASE_URL` for each deployed stack.
+To test multiple combinations, call the script in a loop (or use a matrix in GitHub Actions) over `FILES_PROVIDER`, `INFERENCE_PROVIDER`, and `VECTOR_IO_PROVIDER`, with a single `INFERENCE_MODEL` (or model per inference provider) and the same `BASE_URL` for each deployed stack.
 
-**Container image:** Build from the repo `Containerfile` and run the image with the same env vars (`BASE_URL`, `MODEL`, and optional provider vars). The image runs `run-tests-with-providers.sh` as its entrypoint, so you can run it in any CI that supports containers.
+**Container image:** Build from the repo `Containerfile` and run the image with the same env vars (`BASE_URL`, `INFERENCE_MODEL`, and optional provider vars). The image runs `run-tests-with-providers.sh` as its entrypoint, so you can run it in any CI that supports containers.
 
 ## Reference
 

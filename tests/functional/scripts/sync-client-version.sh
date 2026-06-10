@@ -2,10 +2,11 @@
 # shellcheck disable=SC2317
 # Ensure the installed ogx-client matches the target server.
 #
-# Queries BASE_URL/v1/version, extracts major.minor, and updates
-# pyproject.toml + uv.lock if the pinned version doesn't match.
+# Version source (in priority order):
+#   1. Running server at BASE_URL/v1/version
+#   2. build/build.env OGX_VERSION (same-repo fallback, no server needed)
 #
-# Requires: BASE_URL, curl, python3, uv.
+# Requires: python3, uv. BASE_URL optional if build.env is available.
 
 set -euo pipefail
 
@@ -14,15 +15,25 @@ if [[ "${SKIP_CLIENT_SYNC:-0}" == "1" ]]; then
   return 0 2>/dev/null || exit 0
 fi
 
-: "${BASE_URL:?BASE_URL is required}"
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DIST_ROOT="$(cd "${REPO_ROOT}/../.." && pwd)"
 PYPROJECT="${REPO_ROOT}/pyproject.toml"
+BUILD_ENV="${DIST_ROOT}/build/build.env"
 
-_server_version=$(curl -sf "${BASE_URL}/v1/version" | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null || true)
+_server_version=""
+if [[ -n "${BASE_URL:-}" ]]; then
+  _server_version=$(curl -sf "${BASE_URL}/v1/version" | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null || true)
+fi
+
+if [[ -z "$_server_version" && -f "$BUILD_ENV" ]]; then
+  _server_version=$(grep -oP '^OGX_VERSION=\K.*' "$BUILD_ENV" | sed 's/^v//' || true)
+  if [[ -n "$_server_version" ]]; then
+    echo "Using OGX version from build/build.env: ${_server_version}"
+  fi
+fi
 
 if [[ -z "$_server_version" ]]; then
-  echo "Warning: could not query server version at ${BASE_URL}/v1/version — skipping client sync" >&2
+  echo "Warning: could not determine OGX version (no server at ${BASE_URL:-<unset>}, no build/build.env) — skipping client sync" >&2
   return 0 2>/dev/null || exit 0
 fi
 

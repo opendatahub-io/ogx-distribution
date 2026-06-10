@@ -2,7 +2,7 @@
 # https://github.com/opendatahub-io/ogx-distribution/tree/main/distribution
 #
 # Use with run-tests-with-providers.sh: set FILES_PROVIDER, INFERENCE_PROVIDER,
-# VECTOR_IO_PROVIDER (and MODEL for inference) to run tests against a given combo.
+# VECTOR_IO_PROVIDER (and INFERENCE_MODEL) to run tests against a given combo.
 
 files:
   - id: inline::localfs

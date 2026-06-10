@@ -1,7 +1,7 @@
 # Functional test runner image: run Bruno + notebooks with the same env vars as local.
 # Build: podman build -t ogx-functional-tests .
-# Run: pass BASE_URL, MODEL (required) and optional FILES_PROVIDER, INFERENCE_PROVIDER, VECTOR_IO_PROVIDER
-#   podman run --rm -e BASE_URL=http://lls:8321 -e MODEL=my-model ogx-functional-tests
+# Run: pass BASE_URL, INFERENCE_MODEL (required) and optional FILES_PROVIDER, INFERENCE_PROVIDER, VECTOR_IO_PROVIDER
+#   podman run --rm -e BASE_URL=http://lls:8321 -e INFERENCE_MODEL=my-model ogx-functional-tests
 
 FROM python:3.12-slim
 

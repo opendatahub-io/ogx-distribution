@@ -19,13 +19,13 @@ Notebooks use the **same parameters** as Bruno: `base_url`, `model`, and optiona
 | **test_mcp_tooling.ipynb** | MCP tool-calling; agent calls tool and synthesizes result. Skips gracefully if MCP not available. |
 | **test_negative.ipynb** | Invalid sampling (temp > 2.0) and non-existent MCP tool; assert API returns error. |
 
-All use env: `BASE_URL` (default `http://localhost:8321`), `MODEL` (required, no default). `test_mcp_tooling` uses optional `MCP_TOOL_GROUP`.
+All use env: `BASE_URL` (default `http://localhost:8321`), `INFERENCE_MODEL` (required, no default). `test_mcp_tooling` uses optional `MCP_TOOL_GROUP`.
 
 Notebooks that assert on response content use the shared **`response_text`** helper from **`scripts/helpers.py`** to extract text from Responses API objects (with an inline fallback if the script is not on `PYTHONPATH`). This keeps the QE pattern consistent: **QE Perspective** in the first markdown, **Setup** section with config and helper import, then implementation and assertions. No Langchain; minimal and readable. The original **responses-api.ipynb** is kept as a full demo and is **skipped** when running pytest (see `SKIP_NOTEBOOKS` in `tests/test_notebooks.py`).
 
 ## Reusing Bruno params in notebooks
 
-When you run the test script (or the container image), it exports **env vars** (`BASE_URL`, `MODEL`, etc.). Notebooks read them via **`config.notebook_env`** (which uses `os.environ.get` for all parameters).
+When you run the test script (or the container image), it exports **env vars** (`BASE_URL`, `INFERENCE_MODEL`, etc.). Notebooks read them via **`config.notebook_env`** (which uses `os.environ.get` for all parameters).
 
 ### In your notebook (ipynb)
 
@@ -43,25 +43,25 @@ while repo_root != repo_root.parent and not (repo_root / "config" / "notebook_en
 if (repo_root / "config" / "notebook_env.py").exists():
     sys.path.insert(0, str(repo_root))
 
-# Same params as Bruno (from env: BASE_URL, MODEL, etc.)
+# Same params as Bruno (from env: BASE_URL, INFERENCE_MODEL, etc.)
 from config.notebook_env import base_url, model, api_key, files_provider, inference_provider, vector_io_provider
 
 # Use in requests
-print(f"BASE_URL: {base_url}, MODEL: {model}")
+print(f"BASE_URL: {base_url}, INFERENCE_MODEL: {model}")
 # e.g. requests.get(f"{base_url}/v1/...", ...)
 ```
 
-**When run by the script:** The script exports `BASE_URL`, `MODEL`, and provider vars, and sets `PYTHONPATH` to the repo root. `config.notebook_env` reads them with `os.environ.get`.
+**When run by the script:** The script exports `BASE_URL`, `INFERENCE_MODEL`, and provider vars, and sets `PYTHONPATH` to the repo root. `config.notebook_env` reads them with `os.environ.get`.
 
-**When run interactively:** Set the same env vars (`BASE_URL`, `MODEL`, etc.) before starting Jupyter so `config.notebook_env` can read them.
+**When run interactively:** Set the same env vars (`BASE_URL`, `INFERENCE_MODEL`, etc.) before starting Jupyter so `config.notebook_env` can read them.
 
 ### Summary
 
-All parameters come from **environment variables** (`BASE_URL`, `MODEL`, `API_KEY`, `FILES_PROVIDER`, `INFERENCE_PROVIDER`, `VECTOR_IO_PROVIDER`). Bruno gets them via `--env-var`; notebooks get them via `config.notebook_env` (which uses `os.environ.get` for each).
+All parameters come from **environment variables** (`BASE_URL`, `INFERENCE_MODEL`, `API_KEY`, `FILES_PROVIDER`, `INFERENCE_PROVIDER`, `VECTOR_IO_PROVIDER`). Bruno gets them via `--env-var`; notebooks get them via `config.notebook_env` (which uses `os.environ.get` for each).
 
 ## Running notebooks as tests
 
-From the repo root (with `BASE_URL` and `MODEL` set, and after `pip install -r requirements-test.txt`):
+From the repo root (with `BASE_URL` and `INFERENCE_MODEL` set, and after `pip install -r requirements-test.txt`):
 
 ```bash
 pytest tests/test_notebooks.py -v
