@@ -26,3 +26,4 @@ pytest-report.xml
 .python-version
 CLAUDE.md
 node_modules/
+tests/functional/reports/
