@@ -24,10 +24,19 @@ def _collect_notebooks():
     ]
 
 
+_SKIP_GUARD = nbformat.v4.new_code_cell(
+    source=(
+        'assert not globals().get("_skip_reason"), '
+        'f"Notebook silently skipped: {_skip_reason}"'
+    )
+)
+
+
 @pytest.mark.parametrize("notebook", _collect_notebooks(), ids=lambda p: p.name)
 def test_notebook_execution(notebook: Path):
     """Run notebook to completion; fail on any unhandled exception."""
     with open(notebook) as f:
         nb = nbformat.read(f, as_version=4)
+    nb.cells.append(_SKIP_GUARD)
     ep = ExecutePreprocessor(timeout=TIMEOUT)
     ep.preprocess(nb)
