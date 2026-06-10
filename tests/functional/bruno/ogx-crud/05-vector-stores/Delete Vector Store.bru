@@ -1,0 +1,17 @@
+meta {
+  name: Delete Vector Store
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/v1/vector_stores/{{vector_store_id}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  test("Status is 200 or 204", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}
