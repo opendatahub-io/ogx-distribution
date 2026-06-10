@@ -1,6 +1,6 @@
 # Testing
 
-This document describes the testing strategy for the Open Data Hub Llama Stack Distribution.
+This document describes the testing strategy for the Open Data Hub OGX Distribution.
 
 ## Test Scripts
 
@@ -8,18 +8,18 @@ All test scripts live in the `tests/` directory:
 
 | File | Purpose |
 |------|---------|
-| `smoke.sh` | Smoke tests against a running Llama Stack container |
-| `run_integration_tests.sh` | Integration tests using upstream llama-stack's pytest suite |
+| `smoke.sh` | Smoke tests against a running OGX container |
+| `run_integration_tests.sh` | Integration tests using upstream ogx's pytest suite |
 | `test_utils.sh` | Shared utility functions (e.g., `validate_model_parameter`) |
 
 ### Smoke Tests (`smoke.sh`)
 
 Smoke tests verify the container image works end-to-end. The script:
 
-1. **Starts the Llama Stack container** with environment variables for inference models, embedding models, and database configuration, then waits up to 60 seconds for the `/v1/health` endpoint to return `OK`.
+1. **Starts the OGX container** with environment variables for inference models, embedding models, and database configuration, then waits up to 60 seconds for the `/v1/health` endpoint to return `OK`.
 2. **Model listing** - Verifies each configured model appears in the `/v1/models` response.
 3. **OpenAI-compatible inference** - Sends a chat completion request to `/v1/chat/completions` and validates the response.
-4. **PostgreSQL verification** - Checks that expected database tables (`llamastack_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
+4. **PostgreSQL verification** - Checks that expected database tables (`ogx_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
 
 Models tested depend on available credentials:
 
@@ -38,7 +38,7 @@ export VLLM_INFERENCE_MODEL="vllm-inference/Qwen/Qwen3-0.6B"
 export EMBEDDING_MODEL="vllm-embedding/ibm-granite/granite-embedding-125m-english"
 export VLLM_URL="http://localhost:8000/v1"
 export VLLM_EMBEDDING_URL="http://localhost:8001/v1"
-export IMAGE_NAME="quay.io/opendatahub/llama-stack"
+export IMAGE_NAME="quay.io/opendatahub/odh-ogx-core"
 export IMAGE_TAG="latest"  # In CI, this is set to the commit SHA or source-{sha} tag
 
 # Optional (enables additional model tests)
@@ -51,12 +51,12 @@ export OPENAI_API_KEY="<key>"
 
 ### Integration Tests (`run_integration_tests.sh`)
 
-Integration tests run the upstream [llama-stack pytest suite](https://github.com/llamastack/llama-stack) against the distribution's running server. The script:
+Integration tests run the upstream [ogx pytest suite](https://github.com/ogx/ogx) against the distribution's running server. The script:
 
-1. **Extracts the llama-stack version** from the generated `distribution/Containerfile` to ensure tests match the bundled version.
-2. **Clones the llama-stack repository** at the matching version tag into `/tmp/llama-stack-integration-tests`.
+1. **Extracts the ogx version** from the generated `distribution/Containerfile` to ensure tests match the bundled version.
+2. **Clones the ogx repository** at the matching version tag into `/tmp/ogx-integration-tests`.
 3. **Runs `pytest`** against `tests/integration/inference/` with required test dependencies installed, pointing at `distribution/config.yaml`.
-   - `llama-stack-client` is required.
+   - `ogx-client` is required.
    - `ollama` is explicitly installed because the upstream test fixtures import it, even though this distribution does not use Ollama as a provider.
 
 Tests are run for each configured inference model (vLLM, and optionally Vertex AI and OpenAI).
@@ -77,14 +77,14 @@ Some upstream tests are currently skipped, grouped by reason:
 - `test_tool_with_complex_schema`
 - `test_tool_without_schema`
 
-**Requires vLLM >= v0.12.0** ([llamastack/llama-stack#4984](https://github.com/llamastack/llama-stack/issues/4984)):
+**Requires vLLM >= v0.12.0** ([ogx/ogx#4984](https://github.com/ogx/ogx/issues/4984)):
 - `test_openai_completion_guided_choice`
 
 **`granite-embedding-125m-english` was not trained with Matryoshka Representation Learning**, so vLLM correctly rejects `dimensions` requests with a 400 error:
 - `test_openai_embeddings_with_dimensions`
 - `test_openai_embeddings_with_encoding_format_base64`
 
-**Upstream schema bug** — defines `logprobs` as `bool`, should be `int` ([llamastack/llama-stack#5253](https://github.com/llamastack/llama-stack/issues/5253)):
+**Upstream schema bug** — defines `logprobs` as `bool`, should be `int` ([ogx/ogx#5253](https://github.com/ogx/ogx/issues/5253)):
 - `test_openai_completion_logprobs`
 - `test_openai_completion_logprobs_streaming`
 
@@ -92,7 +92,7 @@ Some upstream tests are currently skipped, grouped by reason:
 
 Prerequisites:
 
-- A running Llama Stack container (started by `smoke.sh` or manually) with a running vLLM inference endpoint and vLLM embedding endpoint behind it
+- A running OGX container (started by `smoke.sh` or manually) with a running vLLM inference endpoint and vLLM embedding endpoint behind it
 - Environment variables:
   - **Required**: `VLLM_INFERENCE_MODEL`, `EMBEDDING_MODEL`, `VLLM_URL`, `VLLM_EMBEDDING_URL`
   - **Optional**: `VERTEX_AI_PROJECT`, `VERTEX_AI_LOCATION`, and `OPENAI_API_KEY` (enables additional model coverage)
@@ -112,8 +112,8 @@ The main CI pipeline that builds, tests, and publishes the container image. It r
 
 - **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `distribution/`, `tests/`, or workflow files change)
 - **Pushes** to `main` and `rhoai-v*` branches
-- **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary llama-stack commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits.
-- **Nightly schedule** (6 AM UTC) to test the `main` branch of llama-stack
+- **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits.
+- **Nightly schedule** (6 AM UTC) to test the `main` branch of ogx
 
 Pipeline steps:
 
@@ -123,10 +123,10 @@ Pipeline steps:
 4. **Start PostgreSQL** via the `setup-postgres` action
 5. **Run smoke tests** (`tests/smoke.sh`)
 6. **Run integration tests** (`tests/run_integration_tests.sh`)
-7. **Publish** multi-arch image to `quay.io/opendatahub/llama-stack` (on push to `main` or `rhoai-v*` branches when `distribution/` changed, or on manual dispatch)
+7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `distribution/` changed, or on manual dispatch)
 8. **Notify Slack** on failure or successful publish
 
-Logs from all containers (llama-stack, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
+Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
 
 ### Pre-commit (`pre-commit.yml`)
 
@@ -143,9 +143,9 @@ Runs on all pull requests and pushes to `main`. Executes the full pre-commit hoo
 
 Validates that pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/) format (e.g., `feat:`, `fix:`, `docs:`).
 
-### Update Llama Stack Version (`update-llama-stack-version.yml`)
+### Update OGX Version (`update-ogx-version.yml`)
 
-Triggered via `repository_dispatch` (type: `update-llama-stack-version`) from the opendatahub-io/llama-stack midstream repo when a new release is tagged. The workflow:
+Triggered via `repository_dispatch` (type: `update-ogx-version`) from the opendatahub-io/ogx midstream repo when a new release is tagged. The workflow:
 
 1. **Validates** the tag format (`vX.Y.Z[.W]+rhaiv.N`) and runs preflight checks (version not already set, branch doesn't exist)
 2. **Updates** `CURRENT_LLAMA_STACK_VERSION` in `distribution/build.py`

@@ -1,5 +1,5 @@
 name: Setup PostgreSQL
-description: Start PostgreSQL for llama-stack
+description: Start PostgreSQL for ogx
 runs:
   using: "composite"
   steps:
@@ -9,16 +9,16 @@ runs:
         docker run -d \
           --name postgres \
           --net=host \
-          -e POSTGRES_USER=llamastack \
-          -e POSTGRES_PASSWORD=llamastack \
-          -e POSTGRES_DB=llamastack \
+          -e POSTGRES_USER=ogx \
+          -e POSTGRES_PASSWORD=ogx \
+          -e POSTGRES_DB=ogx \
           postgres:17
 
         # Wait for PostgreSQL to be ready
         echo "Waiting for PostgreSQL to be ready..."
         postgres_ready=false
         for i in {1..30}; do
-          if docker exec postgres pg_isready -U llamastack -d llamastack; then
+          if docker exec postgres pg_isready -U ogx -d ogx; then
             echo "PostgreSQL is ready!"
             postgres_ready=true
             break

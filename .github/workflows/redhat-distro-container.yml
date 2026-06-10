@@ -19,18 +19,18 @@ on:
       - main
       - rhoai-v*
 
-  # build a custom image from an arbitrary llama-stack commit
+  # build a custom image from an arbitrary ogx commit
   # NOTE: workflow_dispatch intentionally skips all tests (vllm setup, postgres setup, smoke tests, integration tests)
   # This allows building images for specific SHAs even when CI is failing on other commits,
   # useful for testing specific changes without being blocked by unrelated test failures.
   workflow_dispatch:
     inputs:
-      llama_stack_commit_sha:
-        description: 'Llama Stack commit SHA to build from - accept long and short commit SHAs'
+      ogx_commit_sha:
+        description: 'OGX commit SHA to build from - accept long and short commit SHAs'
         required: true
         type: string
 
-  # do a nightly test of the `main` branch of llama-stack at 6AM UTC every morning
+  # do a nightly test of the `main` branch of ogx at 6AM UTC every morning
   schedule:
     - cron: '0 6 * * *'
 
@@ -40,7 +40,7 @@ concurrency:
 
 env:
   REGISTRY: quay.io
-  IMAGE_NAME: quay.io/opendatahub/llama-stack # tags for the image will be added dynamically
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core # tags for the image will be added dynamically
 
 jobs:
   build-test:
@@ -68,7 +68,7 @@ jobs:
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
-      LLAMA_STACK_COMMIT_SHA: ${{ github.event.inputs.llama_stack_commit_sha || 'main' }}
+      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
     permissions:
       id-token: write # for Google Cloud authentication
       contents: read
@@ -102,22 +102,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - name: Generate Containerfile to build an image from an arbitrary llama-stack commit (workflow_dispatch/schedule)
+      - name: Generate Containerfile to build an image from an arbitrary ogx commit (workflow_dispatch/schedule)
         if: contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
         env:
-          LLAMA_STACK_VERSION: ${{ env.LLAMA_STACK_COMMIT_SHA }}
+          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
         run: |
           tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/llama-stack.git "$tmp_build_dir"
+          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/ogx.git "$tmp_build_dir"
           cd "$tmp_build_dir"
-          git checkout "$LLAMA_STACK_VERSION"
+          git checkout "$OGX_VERSION"
           python3 -m venv .venv
           source .venv/bin/activate
+          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
+          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
           pip install --no-cache -e .
+          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
           # now remove the install line from the Containerfile
           cd -
           python3 distribution/build.py
-          sed -i '/^RUN pip install --no-cache llama-stack==/d' distribution/Containerfile
+          sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
 
       - name: Build image for testing (${{ matrix.arch }})
         id: build
@@ -127,7 +130,7 @@ jobs:
           file: distribution/Containerfile
           platforms: ${{ matrix.platform }}
           push: false
-          tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.LLAMA_STACK_COMMIT_SHA, github.sha) || github.sha }}
+          tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           load: true
           cache-from: type=gha,scope=build-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
@@ -167,7 +170,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Authenticate to Google Cloud (Vertex)
-        if: matrix.arch == 'amd64' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
+        if: matrix.arch == 'amd64' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           project_id: ${{ env.VERTEX_AI_PROJECT }}
@@ -213,7 +216,7 @@ jobs:
           # Create logs directory
           mkdir -p logs
 
-          docker logs llama-stack > logs/llama-stack.log 2>&1 || echo "Failed to get llama-stack logs" > logs/llama-stack.log
+          docker logs ogx > logs/ogx.log 2>&1 || echo "Failed to get ogx.logs" > logs/ogx.log
           docker logs vllm-inference > logs/vllm-inference.log 2>&1 || echo "Failed to get vllm-inference logs" > logs/vllm-inference.log
           docker logs vllm-embedding > logs/vllm-embedding.log 2>&1 || echo "Failed to get vllm-embedding logs" > logs/vllm-embedding.log
           docker logs postgres > logs/postgres.log 2>&1 || echo "Failed to get postgres logs" > logs/postgres.log
@@ -233,8 +236,8 @@ jobs:
 
           # Gather integration test logs if they exist
           echo "=== Integration test artifacts ==="
-          if [ -d "/tmp/llama-stack-integration-tests" ]; then
-            find /tmp/llama-stack-integration-tests -name "*.log" -o -name "pytest.log" -o -name "*.out" 2>/dev/null | while read -r file; do
+          if [ -d "/tmp/ogx-integration-tests" ]; then
+            find /tmp/ogx-integration-tests -name "*.log" -o -name "pytest.log" -o -name "*.out" 2>/dev/null | while read -r file; do
               cp "$file" "logs/$(basename "$file")" || true
             done
           fi
@@ -251,7 +254,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          for c in vllm-inference vllm-embedding llama-stack postgres; do
+          for c in vllm-inference vllm-embedding ogx postgres; do
             docker rm -f "$c" 2>/dev/null || true
           done
 
@@ -265,7 +268,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.LLAMA_STACK_COMMIT_SHA, github.sha) || github.sha }}
+          IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           COMMIT_SHA: ${{ github.sha }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -274,13 +277,13 @@ jobs:
 
           if [[ "${NOTIFY_FAILURE:-0}" == "1" ]]; then
             TEXT=$(printf '%s\n%s\n%s' \
-              ":failed: *Build failed for Llama Stack* - [${TIMESTAMP}]" \
+              ":failed: *Build failed for OGX* - [${TIMESTAMP}]" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")
             bash .github/actions/notify-slack/notify.sh "$TEXT" "#d00000"
           else
             TEXT=$(printf '%s\n%s\n%s\n%s' \
-              ":greenchecked: *New image is available for Llama Stack* - [${TIMESTAMP}]" \
+              ":greenchecked: *New image is available for OGX* - [${TIMESTAMP}]" \
               "Image: ${IMAGE_NAME}:${IMAGE_TAG}" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")
@@ -290,21 +293,21 @@ jobs:
       - name: Output custom build information
         if: matrix.arch == 'amd64' && contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
         env:
-          LLS_COMMIT: ${{ env.LLAMA_STACK_COMMIT_SHA }}
+          OGX_COMMIT: ${{ env.OGX_COMMIT_SHA }}
         run: |
           echo "Custom container image built successfully!"
-          echo "Image: $IMAGE_NAME:source-$LLS_COMMIT-$GITHUB_SHA"
-          echo "Llama Stack commit: $LLS_COMMIT"
+          echo "Image: $IMAGE_NAME:source-$OGX_COMMIT-$GITHUB_SHA"
+          echo "OGX commit: $OGX_COMMIT"
           echo ""
           echo "You can pull this image using:"
-          echo "docker pull $IMAGE_NAME:source-$LLS_COMMIT-$GITHUB_SHA"
+          echo "docker pull $IMAGE_NAME:source-$OGX_COMMIT-$GITHUB_SHA"
 
   publish:
     needs: build-test
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && needs.build-test.outputs.distribution-changed == 'true')
     runs-on: ubuntu-latest
     env:
-      LLAMA_STACK_COMMIT_SHA: ${{ github.event.inputs.llama_stack_commit_sha || 'main' }}
+      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
     permissions:
       contents: read
     steps:
@@ -317,22 +320,25 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Generate Containerfile to build an image from an arbitrary llama-stack commit (workflow_dispatch)
+      - name: Generate Containerfile to build an image from an arbitrary ogx commit (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
         env:
-          LLAMA_STACK_VERSION: ${{ env.LLAMA_STACK_COMMIT_SHA }}
+          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
         run: |
           tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/llama-stack.git "$tmp_build_dir"
+          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/ogx.git "$tmp_build_dir"
           cd "$tmp_build_dir"
-          git checkout "$LLAMA_STACK_VERSION"
+          git checkout "$OGX_VERSION"
           python3 -m venv .venv
           source .venv/bin/activate
+          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
+          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
           pip install --no-cache -e .
+          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
           # now remove the install line from the Containerfile
           cd -
           python3 distribution/build.py
-          sed -i '/^RUN pip install --no-cache llama-stack==/d' distribution/Containerfile
+          sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
@@ -354,7 +360,7 @@ jobs:
           file: distribution/Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.LLAMA_STACK_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
+          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
           cache-from: |
             type=gha,scope=build-amd64
             type=gha,scope=build-arm64
@@ -368,7 +374,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('source-{0}-{1}', env.LLAMA_STACK_COMMIT_SHA, github.sha) || github.sha }}
+          IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           COMMIT_SHA: ${{ github.sha }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -377,13 +383,13 @@ jobs:
 
           if [[ "${NOTIFY_FAILURE:-0}" == "1" ]]; then
             TEXT=$(printf '%s\n%s\n%s' \
-              ":failed: *Build failed for Llama Stack* - [${TIMESTAMP}]" \
+              ":failed: *Build failed for OGX* - [${TIMESTAMP}]" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")
             bash .github/actions/notify-slack/notify.sh "$TEXT" "#d00000"
           else
             TEXT=$(printf '%s\n%s\n%s\n%s' \
-              ":greenchecked: *New image is available for Llama Stack* - [${TIMESTAMP}]" \
+              ":greenchecked: *New image is available for OGX* - [${TIMESTAMP}]" \
               "Image: ${IMAGE_NAME}:${IMAGE_TAG}" \
               "Commit: ${COMMIT_SHA_SHORT}" \
               "<${WORKFLOW_URL}|View workflow run>")

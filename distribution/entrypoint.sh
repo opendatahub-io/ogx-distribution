@@ -18,7 +18,7 @@ if [ -n "$OTEL_SERVICE_NAME" ]; then
     --metrics_exporter=otlp \
     --service_name="$OTEL_SERVICE_NAME" \
     -- \
-    llama stack run "$CONFIG" "$@"
+    ogx stack run "$CONFIG" "$@"
 fi
 
-exec llama stack run "$CONFIG" "$@"
+exec ogx stack run "$CONFIG" "$@"

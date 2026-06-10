@@ -1,8 +1,8 @@
-# Open Data Hub Llama Stack Distribution
+# Open Data Hub OGX Distribution
 
-[![Build](https://github.com/opendatahub-io/llama-stack-distribution/actions/workflows/redhat-distro-container.yml/badge.svg?branch=main)](https://github.com/opendatahub-io/llama-stack-distribution/actions/workflows/redhat-distro-container.yml)
+[![Build](https://github.com/opendatahub-io/ogx-distribution/actions/workflows/redhat-distro-container.yml/badge.svg?branch=main)](https://github.com/opendatahub-io/ogx-distribution/actions/workflows/redhat-distro-container.yml)
 
-This directory contains the necessary files to build an Open Data Hub-compatible container image for [Llama Stack](https://github.com/llamastack/llama-stack).
+This directory contains the necessary files to build an Open Data Hub-compatible container image for [OGX](https://github.com/ogx-ai/ogx).
 
 To learn more about the distribution image content, see the [README](distribution/README.md) in the `distribution/` directory.
 
@@ -21,11 +21,11 @@ pre-commit run --all-files
 ```
 
 This will:
-- Install the dependencies (llama-stack etc) in a virtual environment
+- Install the dependencies (ogx etc) in a virtual environment
 - Execute the build script `./distribution/build.py`
 
 The build script will:
-- Execute the `llama` CLI to generate the dependencies
+- Execute the `ogx` CLI to generate the dependencies
 - Create a new `Containerfile` with the required dependencies
 
 ### Editing the Containerfile
@@ -41,7 +41,7 @@ The Containerfile is auto-generated from a template. To edit it, you can modify 
 > Ensure you include any env vars you might need for providers in the container env - you can read more about that [here](distribution/README.md).
 
 ```bash
-podman run -p 8321:8321 quay.io/opendatahub/llama-stack:<tag>
+podman run -p 8321:8321 quay.io/opendatahub/odh-ogx-core:<tag>
 ```
 
 ### What image tag should I use?
@@ -63,7 +63,7 @@ podman run \
   -p 8321:8321 \
   -v <path_on_host>:<path_in_container> \
   -e RUN_CONFIG_PATH=<path_in_container> \
-  quay.io/opendatahub/llama-stack:<tag>
+  quay.io/opendatahub/odh-ogx-core:<tag>
 ```
 
 > [!IMPORTANT]
@@ -92,6 +92,6 @@ To notify multiple channels, use comma-separated webhook URLs in `SLACK_WEBHOOK_
 
 Preview the message format without sending:
 ```bash
-IMAGE_NAME=quay.io/opendatahub/llama-stack IMAGE_TAG=abc123 COMMIT_SHA=abc1234567890 \
+IMAGE_NAME=quay.io/opendatahub/odh-ogx-core IMAGE_TAG=abc123 COMMIT_SHA=abc1234567890 \
   WORKFLOW_URL=https://github.com/... .github/actions/notify-slack/notify.sh --preview
 ```

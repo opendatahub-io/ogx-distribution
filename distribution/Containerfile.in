@@ -2,29 +2,20 @@ FROM registry.access.redhat.com/ubi9/python-312@sha256:95ec8d3ee9f875da011639213
 WORKDIR /opt/app-root
 
 RUN pip install uv
-RUN pip install sqlalchemy # somehow sqlalchemy[asyncio] is not sufficient
-RUN uv pip install opentelemetry-distro
-RUN uv pip install structlog # core llama-stack dep not covered by provider deps
 
-{dependencies}
-{llama_stack_install_source}
+COPY --chmod=755 distribution/install-deps.sh /opt/app-root/install-deps.sh
+RUN /opt/app-root/install-deps.sh
 
-RUN set -o pipefail && opentelemetry-bootstrap -a requirements | uv pip install --requirement -
+{ogx_install_source}
 
-RUN mkdir -p ${HOME}/.llama ${HOME}/.cache
-
-# Pre-cache tiktoken cl100k_base encoding to avoid runtime download
-# from openaipublic.blob.core.windows.net (used by vector_store chunking)
-RUN uv pip install tiktoken==0.12.0
+COPY --chmod=755 distribution/install-common.sh /opt/app-root/install-common.sh
+RUN /opt/app-root/install-common.sh
 ENV TIKTOKEN_CACHE_DIR="${HOME}/.cache/tiktoken"
-RUN python3 -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 
 COPY distribution/config.yaml ${APP_ROOT}/config.yaml
 COPY --chmod=755 distribution/entrypoint.sh ${APP_ROOT}/entrypoint.sh
 
-#TODO: remove this once we have a stable version of llama-stack
-# LLS server version is not aligned with the client version, so we disable the version check
-# Currently, LLS client version is 0.3.0, while the server version is 0.3.0rc3+rhai0
-ENV LLAMA_STACK_DISABLE_VERSION_CHECK=true
+#TODO: remove this once we have a stable version of ogx
+ENV OGX_DISABLE_VERSION_CHECK=true
 
 ENTRYPOINT [ "/opt/app-root/entrypoint.sh" ]

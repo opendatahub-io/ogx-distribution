@@ -1,19 +1,19 @@
-name: Update Llama Stack Version
+name: Update OGX Version
 
-run-name: "Update llama-stack to ${{ github.event.client_payload.tag }}"
+run-name: "Update ogx to ${{ github.event.client_payload.tag }}"
 
 on:
   repository_dispatch:
-    types: [update-llama-stack-version]
+    types: [update-ogx-version]
 
 permissions: {}
 
 env:
   TAG: ${{ github.event.client_payload.tag }}
-  BRANCH: chore/update-llama-stack-${{ github.event.client_payload.tag }}
+  BRANCH: chore/update-ogx-${{ github.event.client_payload.tag }}
   VERSION_FILE: distribution/build.py
   SOURCE_RUN_URL: ${{ github.event.client_payload.source_run_url }}
-  MIDSTREAM_REPO_URL: https://github.com/opendatahub-io/llama-stack
+  MIDSTREAM_REPO_URL: https://github.com/opendatahub-io/ogx
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.client_payload.tag }}
@@ -70,7 +70,7 @@ jobs:
             SHOULD_CONTINUE=false
           fi
 
-          if grep -q "CURRENT_LLAMA_STACK_VERSION = \"${TAG}\"" "$VERSION_FILE"; then
+          if grep -q "CURRENT_OGX_VERSION = \"${TAG}\"" "$VERSION_FILE"; then
             echo "::notice::Version already set to ${TAG} — nothing to update"
             SHOULD_CONTINUE=false
           fi
@@ -101,8 +101,8 @@ jobs:
       - name: Capture old version
         id: current-version
         run: |
-          OLD_VERSION=$(grep '^CURRENT_LLAMA_STACK_VERSION = ' "$VERSION_FILE" | sed 's/.*"\(.*\)"/\1/') \
-            || { echo "::error::Could not find CURRENT_LLAMA_STACK_VERSION in ${VERSION_FILE}"; exit 1; }
+          OLD_VERSION=$(grep '^CURRENT_OGX_VERSION = ' "$VERSION_FILE" | sed 's/.*"\(.*\)"/\1/') \
+            || { echo "::error::Could not find CURRENT_OGX_VERSION in ${VERSION_FILE}"; exit 1; }
           echo "old_version=$OLD_VERSION" >> "$GITHUB_OUTPUT"
           echo "Current version: $OLD_VERSION"
 
@@ -111,13 +111,13 @@ jobs:
 
       - name: Update version in build.py
         run: |
-          sed -i "s|^CURRENT_LLAMA_STACK_VERSION = \".*\"|CURRENT_LLAMA_STACK_VERSION = \"${TAG}\"|" "$VERSION_FILE"
+          sed -i "s|^CURRENT_OGX_VERSION = \".*\"|CURRENT_OGX_VERSION = \"${TAG}\"|" "$VERSION_FILE"
 
-          if ! grep -q "CURRENT_LLAMA_STACK_VERSION = \"${TAG}\"" "$VERSION_FILE"; then
-            echo "::error::Failed to update CURRENT_LLAMA_STACK_VERSION to ${TAG}"
+          if ! grep -q "CURRENT_OGX_VERSION = \"${TAG}\"" "$VERSION_FILE"; then
+            echo "::error::Failed to update CURRENT_OGX_VERSION to ${TAG}"
             exit 1
           fi
-          echo "Updated CURRENT_LLAMA_STACK_VERSION to ${TAG}"
+          echo "Updated CURRENT_OGX_VERSION to ${TAG}"
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
@@ -146,7 +146,7 @@ jobs:
             exit 1
           fi
 
-          git commit -m "chore: update llama-stack to ${TAG}"
+          git commit -m "chore: update ogx to ${TAG}"
 
       - name: Push branch
         run: git push origin "$BRANCH"
@@ -167,7 +167,7 @@ jobs:
           BODY=$(envsubst <<'EOF'
           ## Summary
 
-          Update `CURRENT_LLAMA_STACK_VERSION` from `${OLD_VERSION}` to `${TAG}`
+          Update `CURRENT_OGX_VERSION` from `${OLD_VERSION}` to `${TAG}`
 
           Regenerated distribution artifacts via pre-commit.
 
@@ -179,7 +179,7 @@ jobs:
           ## Test plan
 
           - [ ] Review the generated `distribution/Containerfile` changes
-          - [ ] Verify the new tag exists in opendatahub-io/llama-stack
+          - [ ] Verify the new tag exists in opendatahub-io/ogx
           - [ ] Merge and confirm the distribution container build succeeds
           EOF
           )
@@ -187,7 +187,7 @@ jobs:
           PR_URL=$(gh pr create \
             --base main \
             --head "$BRANCH" \
-            --title "chore: update llama-stack to ${TAG}" \
+            --title "chore: update ogx to ${TAG}" \
             --body "$BODY")
 
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
@@ -199,7 +199,7 @@ jobs:
           PR_URL="${{ steps.create-pr.outputs.pr_url }}"
 
           TEXT=$(printf '%s\n%s\n%s\n%s' \
-            ":greenchecked: *Llama Stack version update to \`${TAG}\` is ready for review*" \
+            ":greenchecked: *OGX version update to \`${TAG}\` is ready for review*" \
             "PR: <${PR_URL}|Review and merge>" \
             "<${WORKFLOW_URL}|View workflow run>" \
             "cc <!subteam^${SLACK_GROUP_LLAMASTACK_RELEASE_MANAGERS}>")
@@ -211,7 +211,7 @@ jobs:
         if: failure()
         run: |
           TEXT=$(printf '%s\n%s\n%s\n%s' \
-            ":failed: *Failed to create llama-stack version update PR*" \
+            ":failed: *Failed to create ogx version update PR*" \
             "Version: \`${TAG}\`" \
             "<${WORKFLOW_URL}|View workflow run>" \
             "cc <!subteam^${SLACK_GROUP_LLAMASTACK_RELEASE_MANAGERS}>")

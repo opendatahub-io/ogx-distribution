@@ -1,21 +1,21 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
+#
 metadata:
   annotations:
-    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/llama-stack-distribution?rev={{revision}}
+    build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/ogx-distribution?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" && ( "distribution/**".pathChanged() || ".tekton/odh-llama-stack-core-push.yaml".pathChanged()
-      )
+      == "main"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: opendatahub-builds
-    appstudio.openshift.io/component: odh-llama-stack-core-ci
+    appstudio.openshift.io/component: odh-ogx-core-ci
     pipelines.appstudio.openshift.io/type: build
-  name: odh-llama-stack-core-on-push
+  name: odh-ogx-core-on-push
   namespace: open-data-hub-tenant
 spec:
   params:
@@ -24,7 +24,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/opendatahub/llama-stack:odh-stable
+    value: quay.io/opendatahub/odh-ogx-core:odh-stable
   - name: dockerfile
     value: distribution/Containerfile
   - name: path-context
@@ -39,7 +39,7 @@ spec:
     - name: pathInRepo
       value: pipeline/multi-arch-container-build.yaml
   taskRunTemplate:
-    serviceAccountName: build-pipeline-odh-llama-stack-core-poc
+    serviceAccountName: build-pipeline-odh-ogx-core-ci
   workspaces:
   - name: git-auth
     secret:

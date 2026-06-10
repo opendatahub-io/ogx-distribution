@@ -3,7 +3,7 @@
 set -exuo pipefail
 
 # Configuration
-WORK_DIR="/tmp/llama-stack-integration-tests"
+WORK_DIR="/tmp/ogx-integration-tests"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source common test utilities
@@ -11,39 +11,39 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test_utils.sh"
 
 # Get repository and version dynamically from Containerfile
-# Look for git URL format: git+https://github.com/*/llama-stack.git@vVERSION or @VERSION
+# Look for git URL format: git+https://github.com/*/ogx.git@vVERSION or @VERSION
 CONTAINERFILE="$SCRIPT_DIR/../distribution/Containerfile"
-GIT_URL=$(grep -o 'git+https://github\.com/[^/]\+/llama-stack\.git@v\?[0-9.+a-z]\+' "$CONTAINERFILE")
+GIT_URL=$(grep -o 'git+https://github\.com/[^/]\+/ogx\.git@v\?[0-9.+a-z]\+' "$CONTAINERFILE")
 if [ -z "$GIT_URL" ]; then
-    echo "Error: Could not extract llama-stack git URL from Containerfile"
+    echo "Error: Could not extract ogx git URL from Containerfile"
     exit 1
 fi
 
 # Extract repo URL (remove git+ prefix and @version suffix)
-LLAMA_STACK_REPO=${GIT_URL#git+}
-LLAMA_STACK_REPO=${LLAMA_STACK_REPO%%@*}
+OGX_REPO=${GIT_URL#git+}
+OGX_REPO=${OGX_REPO%%@*}
 # Extract version (remove git+ prefix and everything before @, and optional v prefix)
-LLAMA_STACK_VERSION=${GIT_URL##*@}
-LLAMA_STACK_VERSION=${LLAMA_STACK_VERSION#v}
-if [ -z "$LLAMA_STACK_VERSION" ]; then
-    echo "Error: Could not extract llama-stack version from Containerfile"
+OGX_VERSION=${GIT_URL##*@}
+OGX_VERSION=${OGX_VERSION#v}
+if [ -z "$OGX_VERSION" ]; then
+    echo "Error: Could not extract ogx version from Containerfile"
     exit 1
 fi
 
-function clone_llama_stack() {
+function clone_ogx() {
     # Clone the repository if it doesn't exist
     if [ ! -d "$WORK_DIR" ]; then
-        git clone "$LLAMA_STACK_REPO" "$WORK_DIR"
+        git clone "$OGX_REPO" "$WORK_DIR"
     fi
 
     # Checkout the specific tag
     cd "$WORK_DIR"
     # fetch origin incase we didn't clone a fresh repo
     git fetch origin
-    if [ "$LLAMA_STACK_VERSION" == "main" ]; then
+    if [ "$OGX_VERSION" == "main" ]; then
         checkout_to="main"
     else
-        checkout_to="v$LLAMA_STACK_VERSION"
+        checkout_to="v$OGX_VERSION"
     fi
     if ! git checkout "$checkout_to"; then
         echo "Error: Could not checkout $checkout_to"
@@ -81,7 +81,7 @@ function run_integration_tests() {
     uv venv --clear
     # shellcheck source=/dev/null
     source .venv/bin/activate
-    uv pip install llama-stack-client ollama
+    uv pip install ogx-client ollama
     uv run pytest -s -v tests/integration/inference/ \
         --stack-config=server:"$STACK_CONFIG_PATH" \
         --text-model="$model" \
@@ -90,10 +90,10 @@ function run_integration_tests() {
 }
 
 function main() {
-    echo "Starting llama-stack integration tests"
+    echo "Starting ogx integration tests"
     echo "Configuration:"
-    echo "  LLAMA_STACK_VERSION: $LLAMA_STACK_VERSION"
-    echo "  LLAMA_STACK_REPO: $LLAMA_STACK_REPO"
+    echo "  OGX_VERSION: $OGX_VERSION"
+    echo "  OGX_REPO: $OGX_REPO"
     echo "  WORK_DIR: $WORK_DIR"
     echo "  VLLM_INFERENCE_MODEL: $VLLM_INFERENCE_MODEL"
     echo "  VERTEX_AI_INFERENCE_MODEL: $VERTEX_AI_INFERENCE_MODEL"
@@ -102,7 +102,7 @@ function main() {
     echo "  VERTEX_AI_PROJECT: ${VERTEX_AI_PROJECT:-<not set>}"
     echo "  OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
 
-    clone_llama_stack
+    clone_ogx
 
     # Build list of models to test based on available configuration
     models_to_test=("$VLLM_INFERENCE_MODEL")
