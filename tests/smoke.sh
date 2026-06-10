@@ -333,9 +333,15 @@ main() {
       fi
     done
 
-    # Basic Messages API (/v1/messages) smoke against the vLLM model
-    # (always available; supports native Anthropic passthrough).
-    if ! test_messages_basic "$VLLM_INFERENCE_MODEL"; then
+    # Basic Messages API (/v1/messages) smoke against the vLLM model.
+    # Skipped on MaaS: the RHOAI 3scale (apicast) gateway only exposes
+    # /v1/chat/completions and returns 403 "No Mapping Rule matched" for
+    # /v1/messages, so native passthrough cannot succeed through it. Native
+    # passthrough is covered deterministically against a local vLLM by
+    # messages-vllm.yml; OpenAI translation by messages-openai.yml.
+    if [ "${USING_MAAS:-false}" == "true" ]; then
+      echo "===> Skipping Messages API smoke (MaaS gateway has no /v1/messages route)"
+    elif ! test_messages_basic "$VLLM_INFERENCE_MODEL"; then
       failed_checks+=("messages:$VLLM_INFERENCE_MODEL")
     fi
 

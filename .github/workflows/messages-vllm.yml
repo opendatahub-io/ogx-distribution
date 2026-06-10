@@ -1,0 +1,121 @@
+name: "Messages: vLLM (native)"
+
+# Native /v1/messages passthrough against a *local* vLLM container.
+#
+# This deliberately does not use the RHOAI MaaS endpoint: that sits behind a
+# 3scale (apicast) gateway which only exposes /v1/chat/completions and returns
+# 403 "No Mapping Rule matched" for /v1/messages. A directly-reachable vLLM
+# serves /v1/messages natively, so this is the deterministic test of the
+# messages provider's native passthrough path.
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: 'Model ID to test (matches the served vLLM model)'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: pinned)'
+        required: false
+        default: ''
+        type: string
+      model:
+        description: 'Model ID to test (matches the served vLLM model)'
+        required: false
+        type: string
+        default: ''
+
+env:
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
+  # Pin to a published image. This must point at an image built AFTER the
+  # Messages API was enabled in build.yaml, otherwise /v1/messages 404s.
+  # Bump alongside the other messages-*.yml pins.
+  IMAGE_TAG: ${{ inputs.image_tag || 'source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c' }}
+  # The vllm-cpu image serves this model (see .github/actions/setup-vllm); the
+  # OGX model id is the served-model-name prefixed with the provider id.
+  VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
+  MODEL: ${{ inputs.model || 'vllm-inference/Qwen/Qwen3.5-0.8B' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Setup vLLM inference container
+        uses: ./.github/actions/setup-vllm
+        env:
+          VLLM_IMAGE: ${{ env.VLLM_IMAGE }}
+          VLLM_MODE: inference
+
+      - name: Setup PostgreSQL
+        uses: ./.github/actions/setup-postgres
+
+      - name: Setup server
+        uses: ./.github/actions/setup-server
+        with:
+          image_name: ${{ env.IMAGE_NAME }}
+          image_tag: ${{ env.IMAGE_TAG }}
+          # Point the messages/inference provider at the local vLLM. No token is
+          # needed (api_token defaults to "fake"); the provider only registers
+          # when VLLM_URL is set.
+          extra_env: |
+            VLLM_URL=http://localhost:8000/v1
+
+      # ── Path 1: basic Messages API request (/v1/messages), native passthrough ──
+      - name: Messages API basic smoke
+        id: messages_basic
+        shell: bash
+        env:
+          MESSAGES_SMOKE_ONLY: 'true'
+          MESSAGES_SMOKE_MODEL: ${{ env.MODEL }}
+        run: ./tests/smoke.sh
+
+      # ── Path 2: Claude Agent SDK session (3-turn) ──────────────────────
+      - name: Install Claude Agent SDK
+        shell: bash
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          uv venv --clear
+          source .venv/bin/activate
+          uv pip install claude-agent-sdk anyio
+
+      # Non-blocking: the local vLLM model (Qwen3.5-0.8B) is small and may not
+      # reliably drive a full 3-turn Agent SDK session. The blocking native
+      # passthrough signal is the basic smoke above.
+      - name: Claude Agent SDK session
+        id: agent_sdk
+        continue-on-error: true
+        shell: bash
+        env:
+          ANTHROPIC_BASE_URL: http://127.0.0.1:8321
+          ANTHROPIC_API_KEY: fake
+          MESSAGES_AGENT_MODEL: ${{ env.MODEL }}
+        run: |
+          source .venv/bin/activate
+          python tests/messages_agent_sdk.py
+
+      - name: Cleanup
+        if: ${{ !cancelled() }}
+        run: |
+          for c in ogx postgres vllm-inference; do
+            docker rm -f "$c" 2>/dev/null || true
+          done

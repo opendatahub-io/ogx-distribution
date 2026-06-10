@@ -23,7 +23,7 @@ Smoke tests verify the container image works end-to-end. The script:
 4. **Messages API** - Sends a single-turn request to the Anthropic-compatible `/v1/messages` endpoint and validates the response shape (a `message` from the `assistant` with a non-empty text block).
 5. **PostgreSQL verification** - Checks that expected database tables (`ogx_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
 
-Setting `MESSAGES_SMOKE_ONLY=true` runs **only** the Messages API check against `MESSAGES_SMOKE_MODEL` and assumes the container is already running (it does not start one). This mode is used by the `messages-openai.yml` workflow.
+Setting `MESSAGES_SMOKE_ONLY=true` runs **only** the Messages API check against `MESSAGES_SMOKE_MODEL` and assumes the container is already running (it does not start one). This mode is used by the `messages-openai.yml` and `messages-vllm.yml` workflows.
 
 Models tested depend on available credentials:
 
@@ -162,21 +162,23 @@ Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as
 > [!NOTE]
 > The basic Messages API check (`/v1/messages`) runs as part of `smoke.sh`, so it is exercised on every PR via this pipeline against the locally-built vLLM model.
 
-### Messages API + Claude Agent SDK (`messages-openai.yml`, `messages-vllm-maas.yml`)
+### Messages API + Claude Agent SDK (`messages-openai.yml`, `messages-vllm.yml`)
 
-Per-provider workflows that mirror their `responses-*.yml` counterparts. Each pulls the published image, boots it with the Messages API enabled and the provider's credentials set, then runs two distinct paths as separate steps so a failure clearly identifies which one broke:
+Per-provider workflows that pull the published image, boot it with the Messages API enabled, then run two distinct paths as separate steps so a failure clearly identifies which one broke:
 
 1. **Messages API basic** - `smoke.sh` in `MESSAGES_SMOKE_ONLY` mode sends a single-turn `/v1/messages` request and asserts the response shape.
 2. **Claude Agent SDK session** - `messages_agent_sdk.py` runs a 3-turn Agent SDK conversation against `/v1/messages`.
 
-| Workflow | Provider | Path exercised |
-|----------|----------|----------------|
+| Workflow | Inference backend | Path exercised |
+|----------|-------------------|----------------|
 | `messages-openai.yml` | OpenAI (`OPENAI_API_KEY`) | Anthropic ⇄ OpenAI translation |
-| `messages-vllm-maas.yml` | vLLM MaaS (`MAAS_VLLM_URL` / `MAAS_VLLM_API_TOKEN`) | Native `/v1/messages` passthrough |
+| `messages-vllm.yml` | Local vLLM container (`vllm-cpu`, no creds) | Native `/v1/messages` passthrough |
 
-The model under test is resolved as `inputs.models` → `vars.TEST_MODELS_<PROVIDER>` (a repo Actions variable) → a hardcoded fallback, matching the `responses-*.yml` workflows. On `messages-vllm-maas.yml` the configured MaaS model can be small (e.g. `Qwen3-0.6B`), so the **Agent SDK session step is non-blocking** there (`continue-on-error`) — it still reports signal but won't fail the workflow on a small-model flake. The basic request step is blocking on both workflows.
+**Why not MaaS?** The RHOAI MaaS endpoint sits behind a 3scale (apicast) gateway that only proxies `/v1/chat/completions` and returns `403 "No Mapping Rule matched"` for `/v1/messages`. Native passthrough therefore can't succeed through it, so passthrough is tested against a directly-reachable local vLLM (`messages-vllm.yml`) rather than MaaS. For the same reason, the per-PR `smoke.sh` skips the Messages basic check when `USING_MAAS=true`.
 
-Each is `workflow_call` + `workflow_dispatch`, and skips automatically when its credentials are not configured (e.g. fork PRs).
+The basic request step is **blocking** on both workflows. The Agent SDK session is **blocking** on `messages-openai.yml` and **non-blocking** (`continue-on-error`) on `messages-vllm.yml`, because the local vLLM model (`Qwen3.5-0.8B`) is small and may not reliably drive a full 3-turn session. The OpenAI model is resolved as `inputs.models` → `vars.TEST_MODELS_OPENAI` → a hardcoded fallback; the vLLM model defaults to the served `vllm-inference/Qwen/Qwen3.5-0.8B`.
+
+`messages-openai.yml` skips automatically when `OPENAI_API_KEY` is not configured (e.g. fork PRs); `messages-vllm.yml` needs no credentials and always runs. Both are `workflow_call` + `workflow_dispatch`.
 
 ### Messages Weekly (`messages-weekly.yml`)
 

@@ -19,12 +19,12 @@ on:
         description: 'OpenAI models (comma-separated, leave empty for defaults)'
         type: string
         default: ''
-      run_vllm_maas:
-        description: 'Run Messages vLLM MaaS tests'
+      run_vllm:
+        description: 'Run Messages native vLLM tests'
         type: boolean
         default: true
-      vllm_maas_models:
-        description: 'vLLM MaaS models (comma-separated, leave empty for defaults)'
+      vllm_model:
+        description: 'Native vLLM model (leave empty for default)'
         type: string
         default: ''
 
@@ -37,10 +37,13 @@ jobs:
       models: ${{ inputs.openai_models }}
     secrets: inherit
 
-  # ── vLLM MaaS (native /v1/messages passthrough path) ─────────────
-  test-vllm-maas:
-    if: github.event_name == 'schedule' || inputs.run_vllm_maas != false
-    uses: ./.github/workflows/messages-vllm-maas.yml
+  # ── Native local vLLM (real /v1/messages passthrough path) ───────
+  # NB: the RHOAI MaaS gateway only proxies /v1/chat/completions and returns
+  # 403 for /v1/messages, so native passthrough is tested against a local vLLM
+  # container instead of MaaS.
+  test-vllm:
+    if: github.event_name == 'schedule' || inputs.run_vllm != false
+    uses: ./.github/workflows/messages-vllm.yml
     with:
-      models: ${{ inputs.vllm_maas_models }}
+      model: ${{ inputs.vllm_model }}
     secrets: inherit
