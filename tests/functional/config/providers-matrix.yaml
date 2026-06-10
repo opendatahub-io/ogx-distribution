@@ -36,18 +36,12 @@ inference:
     description: Sentence transformers (set ENABLE_SENTENCE_TRANSFORMERS)
 
 vector_io:
-  - id: inline::milvus
-    provider_type: inline::milvus
-    description: Inline Milvus (default)
+  - id: remote::pgvector
+    provider_type: remote::pgvector
+    description: pgvector (default, set ENABLE_PGVECTOR, PGVECTOR_*)
   - id: inline::faiss
     provider_type: inline::faiss
     description: FAISS (set ENABLE_FAISS)
-  - id: remote::milvus
-    provider_type: remote::milvus
-    description: Remote Milvus (set MILVUS_ENDPOINT)
-  - id: remote::pgvector
-    provider_type: remote::pgvector
-    description: pgvector (set ENABLE_PGVECTOR, PGVECTOR_*)
   - id: remote::qdrant
     provider_type: remote::qdrant
     description: Qdrant (set ENABLE_QDRANT, QDRANT_*)

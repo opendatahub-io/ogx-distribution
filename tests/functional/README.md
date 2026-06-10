@@ -6,8 +6,8 @@ Functional tests for OGX distribution — Bruno API contracts + Jupyter notebook
 
 ```bash
 # 1. Start OGX + PostgreSQL locally (or point to an existing deployment)
-export BASE_URL="http://localhost:8321"
-export INFERENCE_MODEL="vllm-inference/llama-3-2-3b"
+#    Copy .env.example and set BASE_URL + INFERENCE_MODEL for your deployment
+cp .env.example .env && source .env
 
 # 2. Install deps
 cd tests/functional
@@ -22,18 +22,18 @@ Reports land in `reports/` as JUnit XML (Bruno: `bruno-crud.xml`, notebooks: `no
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `BASE_URL` | **Yes** | — | OGX server URL (e.g. `http://localhost:8321`) |
-| `INFERENCE_MODEL` | **Yes** | — | Inference model name (e.g. `vllm-inference/llama-3-2-3b`, `openai/gpt-4.1-nano`) |
-| `EMBEDDING_MODEL` | No | `""` | Embedding model name |
-| `EMBEDDING_DIMENSION` | No | `768` | Embedding vector dimension |
-| `FILES_PROVIDER` | No | `""` | Override files provider (e.g. `remote::s3`) |
-| `INFERENCE_PROVIDER` | No | `""` | Override inference provider (e.g. `remote::azure`) |
-| `VECTOR_IO_PROVIDER` | No | `""` | Override vector IO provider (e.g. `remote::pgvector`) |
-| `HEALTH_CHECK_TIMEOUT` | No | `0` | Seconds to wait for server readiness (0 = skip, set to 600 in CI) |
+| Variable | Description |
+|---|---|
+| `BASE_URL` | OGX server URL (e.g. `http://localhost:8321`) |
+| `INFERENCE_MODEL` | Inference model name (e.g. `vllm-inference/llama-3-2-3b`) |
+| `EMBEDDING_MODEL` | Embedding model name |
+| `EMBEDDING_DIMENSION` | Embedding vector dimension (default: `768`) |
+| `FILES_PROVIDER` | Files provider (e.g. `meta-reference-files`, `remote::s3`) |
+| `INFERENCE_PROVIDER` | Inference provider (e.g. `vllm-inference`, `remote::azure`) |
+| `VECTOR_IO_PROVIDER` | Vector IO provider (e.g. `pgvector`, `remote::qdrant`) |
+| `HEALTH_CHECK_TIMEOUT` | Seconds to wait for server readiness (0 = skip, set to 600 in CI) |
 
-Provider routing (which inference/vector/files backend to use) is configured **server-side** in the OGX config. These env vars are used for test selection and reporting, not provider routing.
+All variables are auto-discovered by `setup-server.sh` from the running OGX instance. For manual runs, copy `.env.example` and set the values for your deployment.
 
 ## Test Layers
 

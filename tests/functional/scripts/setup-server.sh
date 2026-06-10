@@ -265,6 +265,8 @@ start_postgres() {
                 fi
                 echo -e "${GREEN}Database cleaned up.${NC}"
             fi
+            podman exec "$pg_name" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
+                -c "CREATE EXTENSION IF NOT EXISTS vector;" 2>/dev/null || true
             return 0
         fi
         if [[ $i -eq 30 ]]; then
