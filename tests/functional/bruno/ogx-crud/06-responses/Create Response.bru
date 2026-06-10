@@ -1,0 +1,32 @@
+meta {
+  name: Create Response
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/responses
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "model": "{{model}}",
+    "input": "Say hello in one word."
+  }
+}
+
+script:post-response {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has id and output", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("id");
+    expect(body.id).to.be.a("string");
+    expect(body).to.have.property("output");
+    expect(body.output).to.be.an("array");
+    bru.setEnvVar("response_id", body.id);
+  });
+}

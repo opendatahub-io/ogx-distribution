@@ -1,0 +1,23 @@
+meta {
+  name: List Routes
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1alpha/admin/inspect/routes
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has routes array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("data");
+    expect(body.data).to.be.an("array");
+    expect(body.data.length).to.be.greaterThan(0);
+  });
+}
