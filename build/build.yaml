@@ -230,6 +230,9 @@ storage:
     connectors:
       table_name: connectors
       backend: sql_default
+    vector_stores:
+      backend: sql_default
+      table_name: vector_store_metadata
 registered_resources:
   models:
   - metadata:
