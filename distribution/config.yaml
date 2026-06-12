@@ -9,6 +9,7 @@ version: 2
 image_name: rh
 apis:
 - responses
+- messages
 - batches
 - inference
 - tool_runtime
@@ -124,6 +125,16 @@ providers:
           table_name: agents_responses
           max_write_queue_size: 10000
           num_writers: 4
+  messages:
+  # Implements the Anthropic Messages API (/v1/messages). Native passthrough for
+  # providers that support it (e.g. vLLM); translates Anthropic <-> OpenAI Chat
+  # Completions for all other providers. Depends on the inference API.
+  - provider_id: builtin
+    provider_type: inline::builtin
+    config:
+      kvstore:
+        backend: kv_default
+        namespace: message_batches
   tool_runtime:
   # NOTE: inline::file-search requires a 'files' provider at runtime
   # (currently inline::localfs). Do not add inline::localfs to
@@ -212,6 +223,9 @@ storage:
     connectors:
       table_name: connectors
       backend: sql_default
+    vector_stores:
+      backend: sql_default
+      table_name: vector_store_metadata
 registered_resources:
   models:
   - metadata:
@@ -234,6 +248,7 @@ telemetry:
   enabled: true
 server:
   port: 8321
+  registry_refresh_interval_seconds: ${env.REGISTRY_REFRESH_INTERVAL_SECONDS:=300}
   auth:
     provider_config:
       type: ${env.AUTH_ISSUER:+oauth2_token}

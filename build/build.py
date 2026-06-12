@@ -27,9 +27,7 @@ _VERSION_PATTERN = re.compile(r"^[0-9a-zA-Z._+\-/]+$")
 
 OGX_GIT_REPO = "https://github.com/opendatahub-io/ogx.git"
 
-PINNED_DEPENDENCIES = [
-    'milvus-lite==2.5.1; platform_machine != "ppc64le"',
-]
+PINNED_DEPENDENCIES = ["milvus-lite>=3.0.0", "pymilvus!=2.6.10"]
 
 CONSTRAINTS_FILE = Path("distribution/constraints.txt")
 
@@ -197,16 +195,40 @@ def generate_stripped_config():
     print(f"Successfully generated {output_path}")
 
 
+def _resolve_env_defaults(text):
+    """Replace ${env.VAR:=default} and ${env.VAR:+value} templates.
+
+    Pydantic validates build.yaml before env-var substitution, so
+    non-string fields (e.g. integers) must contain plain values.
+    Empty defaults are quoted to avoid YAML null interpretation.
+    """
+
+    def _replace_default(match):
+        default = match.group(1)
+        return f'"{default}"' if default == "" else default
+
+    text = re.sub(r"\$\{env\.[^:}]+:=([^}]*)\}", _replace_default, text)
+    text = re.sub(r"\$\{env\.[^:}]+:\+([^}]*)\}", r'"\1"', text)
+    return text
+
+
 def get_dependencies(ogx_bin: Path) -> list[str]:
     """Execute the ogx list-deps command and return a list of package specifiers."""
-    cmd = [str(ogx_bin), "stack", "list-deps", "build/build.yaml"]
+    build_yaml = Path("build/build.yaml")
+    resolved = _resolve_env_defaults(build_yaml.read_text())
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
+        tmp.write(resolved)
+        tmp_path = tmp.name
     try:
+        cmd = [str(ogx_bin), "stack", "list-deps", tmp_path]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error executing command: {e}")
         print(f"Command output: {e.output}")
         print(f"Command stderr: {e.stderr}")
         sys.exit(1)
+    finally:
+        os.unlink(tmp_path)
 
     packages = []
     for line in result.stdout.splitlines():
