@@ -47,14 +47,13 @@ The entrypoint is `vllm serve`, so pass model and serving arguments directly. Th
 ```bash
 docker run -d \
     --name vllm-inference \
-    --privileged=true \
     --net=host \
     vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english \
     --host 0.0.0.0 \
     --port 8000 \
     --enable-auto-tool-choice \
     --tool-call-parser hermes \
-    --model /root/.cache/Qwen/Qwen3.5-0.8B \
+    --model /opt/vllm/models/Qwen/Qwen3.5-0.8B \
     --served-model-name Qwen/Qwen3.5-0.8B \
     --max-model-len 8192
 ```
@@ -64,14 +63,13 @@ docker run -d \
 ```bash
 docker run -d \
     --name vllm-embedding \
-    --privileged=true \
     --net=host \
     vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english \
     --host 0.0.0.0 \
     --port 8001 \
-    --model /root/.cache/ibm-granite/granite-embedding-125m-english \
+    --model /opt/vllm/models/ibm-granite/granite-embedding-125m-english \
     --served-model-name ibm-granite/granite-embedding-125m-english
 ```
 
 > [!TIP]
-> Additional vLLM arguments can be passed directly. Models are stored under `/root/.cache/<model_id>`.
+> Additional vLLM arguments can be passed directly. Models are stored under `/opt/vllm/models/<model_id>`.
