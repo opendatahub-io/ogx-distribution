@@ -4,7 +4,7 @@
 
 This image contains the official Open Data Hub OGX distribution, with all the packages and configuration needed to run an OGX server in a containerized environment.
 
-The image is currently shipping with the Open Data Hub version of OGX version [1.0.2+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.0.2+rhaiv.0)
+The image is currently shipping with the Open Data Hub version of OGX version [1.1.0+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.1.0+rhaiv.0)
 
 You can see an overview of the APIs and Providers the image ships with in the table below.
 
@@ -17,13 +17,14 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |
 | inference | remote::anthropic | No | ❌ | Set the `ANTHROPIC_API_KEY` environment variable |
 | inference | remote::azure | No | ❌ | Set the `AZURE_API_KEY` environment variable |
-| inference | remote::bedrock | No | ❌ | Set the `AWS_BEARER_TOKEN_BEDROCK` environment variable |
+| inference | remote::bedrock | No | ❌ | Set the `ENABLE_BEDROCK` environment variable |
 | inference | remote::gemini | No | ❌ | Set the `ENABLE_GEMINI` environment variable |
 | inference | remote::openai | No | ❌ | Set the `OPENAI_API_KEY` environment variable |
 | inference | remote::vertexai | No | ❌ | Set the `VERTEX_AI_PROJECT` environment variable |
 | inference | remote::vllm | No | ❌ | Set the `VLLM_URL` environment variable |
 | inference | remote::vllm | No | ❌ | Set the `VLLM_EMBEDDING_URL` environment variable |
 | inference | remote::watsonx | No | ❌ | Set the `WATSONX_API_KEY` environment variable |
+| messages | inline::builtin | No | ✅ | N/A |
 | responses | inline::builtin | No | ✅ | N/A |
 | tool_runtime | inline::file-search | No | ✅ | N/A |
 | tool_runtime | remote::brave-search | No | ✅ | N/A |

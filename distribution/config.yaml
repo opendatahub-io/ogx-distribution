@@ -9,6 +9,7 @@ version: 2
 image_name: rh
 apis:
 - responses
+- messages
 - batches
 - inference
 - tool_runtime
@@ -33,11 +34,13 @@ providers:
       api_token: ${env.VLLM_EMBEDDING_API_TOKEN:=fake}
       tls_verify: ${env.VLLM_EMBEDDING_TLS_VERIFY:=true}
       refresh_models: ${env.VLLM_EMBEDDING_REFRESH_MODELS:=false}
-  - provider_id: ${env.AWS_BEARER_TOKEN_BEDROCK:+bedrock}
+  - provider_id: ${env.ENABLE_BEDROCK:+bedrock}
     provider_type: remote::bedrock
     config:
-      api_key: ${env.AWS_BEARER_TOKEN_BEDROCK:=}
+      aws_bedrock_bearer_token: ${env.AWS_BEDROCK_BEARER_TOKEN:=}
       region_name: ${env.AWS_DEFAULT_REGION:=us-east-2}
+      aws_role_arn: ${env.AWS_ROLE_ARN:=}
+      aws_web_identity_token_file: ${env.AWS_WEB_IDENTITY_TOKEN_FILE:=}
   - provider_id: ${env.WATSONX_API_KEY:+watsonx}
     provider_type: remote::watsonx
     config:
@@ -124,6 +127,16 @@ providers:
           table_name: agents_responses
           max_write_queue_size: 10000
           num_writers: 4
+  messages:
+  # Implements the Anthropic Messages API (/v1/messages). Native passthrough for
+  # providers that support it (e.g. vLLM); translates Anthropic <-> OpenAI Chat
+  # Completions for all other providers. Depends on the inference API.
+  - provider_id: builtin
+    provider_type: inline::builtin
+    config:
+      kvstore:
+        backend: kv_default
+        namespace: message_batches
   tool_runtime:
   # NOTE: inline::file-search requires a 'files' provider at runtime
   # (currently inline::localfs). Do not add inline::localfs to
@@ -212,6 +225,9 @@ storage:
     connectors:
       table_name: connectors
       backend: sql_default
+    vector_stores:
+      backend: sql_default
+      table_name: vector_store_metadata
 registered_resources:
   models:
   - metadata:

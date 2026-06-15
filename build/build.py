@@ -27,9 +27,7 @@ _VERSION_PATTERN = re.compile(r"^[0-9a-zA-Z._+\-/]+$")
 
 OGX_GIT_REPO = "https://github.com/opendatahub-io/ogx.git"
 
-PINNED_DEPENDENCIES = [
-    'milvus-lite==2.5.1; platform_machine != "ppc64le"',
-]
+PINNED_DEPENDENCIES = ["milvus-lite>=3.0.0", "pymilvus!=2.6.10"]
 
 CONSTRAINTS_FILE = Path("distribution/constraints.txt")
 

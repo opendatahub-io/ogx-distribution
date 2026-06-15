@@ -12,7 +12,7 @@ ARG EMBEDDING_MODEL=""
 
 ENV INFERENCE_MODEL="${INFERENCE_MODEL}"
 ENV EMBEDDING_MODEL="${EMBEDDING_MODEL}"
-ENV MODEL_CACHE_DIR="/root/.cache"
+ENV MODEL_CACHE_DIR="/opt/vllm/models"
 
 RUN if [ -z "${INFERENCE_MODEL}" ]; then \
         echo "ERROR: INFERENCE_MODEL build argument is required" >&2 && exit 1; \
@@ -32,7 +32,10 @@ RUN --mount=type=secret,id=hf_token \
         else \
             hf download "${model}" --local-dir "${model_path}"; \
         fi && \
-        rm -rf /root/.cache/huggingface "${model_path}/original"; \
+        rm -rf "${MODEL_CACHE_DIR}/.huggingface" "${model_path}/original"; \
     done
+
+RUN useradd -r -u 1001 -m vllm
+USER 1001
 
 ENTRYPOINT ["vllm", "serve"]
