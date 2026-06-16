@@ -63,11 +63,13 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
       VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
       VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
+      ANTHROPIC_INFERENCE_MODEL: anthropic/claude-sonnet-4-6
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
@@ -132,7 +134,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
               echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
-              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; } >> "$GITHUB_ENV"
               exit 0
             fi
           fi
@@ -166,6 +168,20 @@ jobs:
           if [ -z "$VERTEX_AI_PROJECT" ] || [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
             echo "::warning::Vertex AI credentials not configured, skipping Vertex AI tests"
             { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; } >> "$GITHUB_ENV"
+          fi
+
+          # Anthropic: validate key with a lightweight call
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              -H "x-api-key: $ANTHROPIC_API_KEY" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"claude-sonnet-4-6","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
+              https://api.anthropic.com/v1/messages)
+            if [ "$status" != "200" ]; then
+              echo "::warning::Anthropic API returned HTTP $status, skipping Anthropic tests"
+              echo "ANTHROPIC_API_KEY=" >> "$GITHUB_ENV"
+            fi
           fi
 
           # MaaS vLLM: presence check
