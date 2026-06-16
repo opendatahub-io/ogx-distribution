@@ -12,7 +12,9 @@ on:
     paths:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
+      - 'build/**'
       - 'Containerfile'
+      - 'Containerfile.in'
       - 'distribution/**'
       - 'tests/**'
   push:
@@ -125,6 +127,13 @@ jobs:
           load: true
           cache-from: type=gha,scope=build-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
+
+      - name: Verify OCI config labels
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
+        run: |
+          ./tests/verify-config-label.sh "$IMAGE_TAG"
 
       - name: Validate provider credentials
         env:
