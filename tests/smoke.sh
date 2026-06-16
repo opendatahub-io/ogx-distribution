@@ -300,7 +300,7 @@ function test_rag_file_ingestion {
 
   echo "===> Polling file ingestion status..."
   for i in {1..30}; do
-    status_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores/$vs_id/files/$file_id" 2>/dev/null || echo '{}')
+    status_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores/$vs_id/files/$attached_file_id" 2>/dev/null || echo '{}')
     file_status=$(echo "$status_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null)
 
     if [ "$file_status" = "completed" ]; then
