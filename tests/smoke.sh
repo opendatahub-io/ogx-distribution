@@ -58,8 +58,14 @@ function start_and_wait_for_ogx_container {
     docker_args+=(--env "OPENAI_API_KEY=$OPENAI_API_KEY")
   fi
 
-  # Only add Gemini configuration if GEMINI_API_KEY is set
-  if [ -n "${GEMINI_API_KEY:-}" ]; then
+  # Add Gemini configuration: prefer Bearer token (access token), fall back to API key
+  if [ -n "${GEMINI_ACCESS_TOKEN:-}" ] && [ -n "${GEMINI_AI_PROJECT:-}" ]; then
+    docker_args+=(
+      --env "ENABLE_GEMINI=1"
+      --env "GEMINI_ACCESS_TOKEN=$GEMINI_ACCESS_TOKEN"
+      --env "GEMINI_AI_PROJECT=$GEMINI_AI_PROJECT"
+    )
+  elif [ -n "${GEMINI_API_KEY:-}" ]; then
     docker_args+=(
       --env "ENABLE_GEMINI=1"
       --env "GEMINI_API_KEY=$GEMINI_API_KEY"
@@ -310,13 +316,13 @@ main() {
       echo "===> OPENAI_API_KEY is not set, skipping OpenAI models"
     fi
 
-    # Only include Gemini models if GEMINI_API_KEY is set
-    if [ -n "${GEMINI_API_KEY:-}" ]; then
-      echo "===> GEMINI_API_KEY is set, including Gemini models in tests"
+    # Only include Gemini models if credentials (Bearer token or API key) are set
+    if [ -n "${GEMINI_ACCESS_TOKEN:-}" ] || [ -n "${GEMINI_API_KEY:-}" ]; then
+      echo "===> Gemini credentials available, including Gemini models in tests"
       models_to_test+=("$GEMINI_INFERENCE_MODEL")
       inference_models_to_test+=("$GEMINI_INFERENCE_MODEL")
     else
-      echo "===> GEMINI_API_KEY is not set, skipping Gemini models"
+      echo "===> Gemini credentials not available, skipping Gemini models"
     fi
 
     echo "===> Testing model list for all models..."

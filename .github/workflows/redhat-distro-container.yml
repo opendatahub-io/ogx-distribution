@@ -61,6 +61,7 @@ jobs:
     env:
       VERTEX_AI_PROJECT: ${{ secrets.VERTEX_AI_PROJECT }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GEMINI_AI_PROJECT: ${{ secrets.GEMINI_AI_PROJECT }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
@@ -150,12 +151,15 @@ jobs:
             fi
           fi
 
-          # Gemini: validate key with a lightweight call
-          if [ -n "$GEMINI_API_KEY" ]; then
+          # Gemini: prefer Bearer token via WIF, fall back to API key
+          if [ -n "$GEMINI_AI_PROJECT" ] && [ -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
+            echo "Gemini: will attempt Bearer token auth via WIF"
+            echo "USE_GEMINI_BEARER=true" >> "$GITHUB_ENV"
+          elif [ -n "$GEMINI_API_KEY" ]; then
             status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
               "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY")
             if [ "$status" != "200" ]; then
-              echo "::warning::Gemini API returned HTTP $status, skipping Gemini tests"
+              echo "::warning::Gemini API key returned HTTP $status, skipping Gemini tests"
               { echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
             else
               echo "ENABLE_GEMINI=1" >> "$GITHUB_ENV"
@@ -203,6 +207,32 @@ jobs:
         with:
           project_id: ${{ env.VERTEX_AI_PROJECT }}
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Set up Google Cloud SDK (Gemini)
+        if: env.USE_GEMINI_BEARER == 'true' && matrix.arch == 'amd64' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Configure Gemini auth
+        if: env.USE_GEMINI_BEARER == 'true'
+        run: |
+          GEMINI_TOKEN=$(gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/generative-language.retriever 2>/dev/null || true)
+          if [ -n "$GEMINI_TOKEN" ]; then
+            echo "::add-mask::$GEMINI_TOKEN"
+            echo "Gemini: Bearer token obtained, using OAuth/ADC auth"
+            {
+              echo "ENABLE_GEMINI=1"
+              echo "GEMINI_ACCESS_TOKEN=$GEMINI_TOKEN"
+              echo "GEMINI_AI_PROJECT=$GEMINI_AI_PROJECT"
+              echo "GEMINI_API_KEY="
+            } >> "$GITHUB_ENV"
+          elif [ -n "$GEMINI_API_KEY" ]; then
+            echo "::warning::Gemini Bearer token auth failed, falling back to API key"
+            echo "ENABLE_GEMINI=1" >> "$GITHUB_ENV"
+            echo "USE_GEMINI_BEARER=" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No Gemini credentials available, skipping Gemini tests"
+            echo "ENABLE_GEMINI=" >> "$GITHUB_ENV"
+          fi
 
       - name: Setup vLLM inference container
         if: github.event_name != 'workflow_dispatch' && env.USING_MAAS != 'true'
