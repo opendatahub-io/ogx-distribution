@@ -6,12 +6,22 @@ runs:
     - name: Start vLLM container
       shell: bash
       run: |
+        # Read MODEL_CACHE_DIR from the image so the action works with both
+        # old images (/root/.cache) and new images (/opt/vllm/models).
+        # Pull if not already present (locally-built images are already loaded).
+        if ! docker image inspect "$VLLM_IMAGE" >/dev/null 2>&1; then
+          docker pull "$VLLM_IMAGE"
+        fi
+        MODEL_DIR=$(docker inspect "$VLLM_IMAGE" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+          | grep '^MODEL_CACHE_DIR=' | cut -d= -f2)
+        MODEL_DIR="${MODEL_DIR:-/opt/vllm/models}"
+
         # Set VLLM_ARGS based on VLLM_MODE
         if [[ "$VLLM_MODE" == "inference" ]]; then
-          VLLM_ARGS="--host 0.0.0.0 --port 8000 --enforce-eager --language-model-only --skip-mm-profiling --enable-auto-tool-choice --tool-call-parser hermes --model /root/.cache/Qwen/Qwen3.5-0.8B --served-model-name Qwen/Qwen3.5-0.8B --max-model-len 8192 --gpu-memory-utilization 0.50"
+          VLLM_ARGS="--host 0.0.0.0 --port 8000 --enforce-eager --language-model-only --skip-mm-profiling --enable-auto-tool-choice --tool-call-parser hermes --model ${MODEL_DIR}/Qwen/Qwen3.5-0.8B --served-model-name Qwen/Qwen3.5-0.8B --max-model-len 8192 --gpu-memory-utilization 0.50"
           VLLM_PORT=8000
         elif [[ "$VLLM_MODE" == "embedding" ]]; then
-          VLLM_ARGS="--host 0.0.0.0 --port 8001 --model /root/.cache/ibm-granite/granite-embedding-125m-english --served-model-name ibm-granite/granite-embedding-125m-english --gpu-memory-utilization 0.25"
+          VLLM_ARGS="--host 0.0.0.0 --port 8001 --model ${MODEL_DIR}/ibm-granite/granite-embedding-125m-english --served-model-name ibm-granite/granite-embedding-125m-english --gpu-memory-utilization 0.25"
           VLLM_PORT=8001
         else
           echo "Error: VLLM_MODE must be set to 'inference' or 'embedding'"
@@ -21,7 +31,6 @@ runs:
         # Start vllm container
         docker run -d \
           --name vllm-$VLLM_MODE \
-          --privileged=true \
           --net=host \
           $VLLM_IMAGE \
           $VLLM_ARGS

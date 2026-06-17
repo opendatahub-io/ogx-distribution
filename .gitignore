@@ -3,7 +3,6 @@ __pycache__
 dist
 *.egg-info
 dev_requirements.txt
-build
 .DS_Store
 ogx/configs/*
 .cursor/
@@ -24,4 +23,3 @@ venv/
 pytest-report.xml
 .coverage
 .python-version
-CLAUDE.md

@@ -1,0 +1,131 @@
+name: "Messages: OpenAI"
+
+on:
+  workflow_call:
+    inputs:
+      models:
+        description: 'Comma-separated model IDs to test (leave empty for defaults)'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
+
+env:
+  PROVIDER_NAME: openai
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
+  # Pin to a published image. This must point at an image built AFTER the
+  # Messages API was enabled in build.yaml, otherwise /v1/messages 404s.
+  # Bump alongside responses-openai.yml's pin.
+  IMAGE_TAG: ${{ inputs.image_tag || 'source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
+    steps:
+      - name: Check OpenAI credentials
+        id: check
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::warning::OPENAI_API_KEY not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve models
+        id: models
+        env:
+          INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_OPENAI }}
+        run: |
+          default='["openai/gpt-4.1-nano"]'
+          if [ -z "$INPUT_MODELS" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(printf '%s' "$INPUT_MODELS" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJson(needs.check.outputs.models_json) }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Setup PostgreSQL
+        uses: ./.github/actions/setup-postgres
+
+      - name: Setup server
+        uses: ./.github/actions/setup-server
+        with:
+          image_name: ${{ env.IMAGE_NAME }}
+          image_tag: ${{ env.IMAGE_TAG }}
+          extra_env: |
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+
+      # ── Path 1: basic Messages API request (/v1/messages) ──────────────
+      - name: Messages API basic smoke
+        id: messages_basic
+        shell: bash
+        env:
+          MESSAGES_SMOKE_ONLY: 'true'
+          MESSAGES_SMOKE_MODEL: ${{ matrix.model }}
+        run: ./tests/smoke.sh
+
+      # ── Path 2: Claude Agent SDK session (3-turn) ──────────────────────
+      - name: Install Claude Agent SDK
+        shell: bash
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          uv venv --clear
+          source .venv/bin/activate
+          uv pip install claude-agent-sdk anyio
+
+      - name: Claude Agent SDK session
+        id: agent_sdk
+        shell: bash
+        env:
+          ANTHROPIC_BASE_URL: http://127.0.0.1:8321
+          ANTHROPIC_API_KEY: fake
+          MESSAGES_AGENT_MODEL: ${{ matrix.model }}
+        run: |
+          source .venv/bin/activate
+          python tests/messages_agent_sdk.py
+
+      - name: Cleanup
+        if: ${{ !cancelled() }}
+        run: |
+          for c in ogx postgres; do
+            docker rm -f "$c" 2>/dev/null || true
+          done

@@ -7,6 +7,7 @@
 
 # Usage: ./build/build.py
 
+import base64
 import shutil
 import subprocess
 import sys
@@ -27,9 +28,7 @@ _VERSION_PATTERN = re.compile(r"^[0-9a-zA-Z._+\-/]+$")
 
 OGX_GIT_REPO = "https://github.com/opendatahub-io/ogx.git"
 
-PINNED_DEPENDENCIES = [
-    'milvus-lite==2.5.1; platform_machine != "ppc64le"',
-]
+PINNED_DEPENDENCIES = ["milvus-lite>=3.0.0", "pymilvus!=2.6.10"]
 
 CONSTRAINTS_FILE = Path("distribution/constraints.txt")
 
@@ -201,16 +200,40 @@ def generate_stripped_config():
     print(f"Successfully generated {output_path}")
 
 
+def _resolve_env_defaults(text):
+    """Replace ${env.VAR:=default} and ${env.VAR:+value} templates.
+
+    Pydantic validates build.yaml before env-var substitution, so
+    non-string fields (e.g. integers) must contain plain values.
+    Empty defaults are quoted to avoid YAML null interpretation.
+    """
+
+    def _replace_default(match):
+        default = match.group(1)
+        return f'"{default}"' if default == "" else default
+
+    text = re.sub(r"\$\{env\.[^:}]+:=([^}]*)\}", _replace_default, text)
+    text = re.sub(r"\$\{env\.[^:}]+:\+([^}]*)\}", r'"\1"', text)
+    return text
+
+
 def get_dependencies(ogx_bin: Path) -> list[str]:
     """Execute the ogx list-deps command and return a list of package specifiers."""
-    cmd = [str(ogx_bin), "stack", "list-deps", "build/build.yaml"]
+    build_yaml = Path("build/build.yaml")
+    resolved = _resolve_env_defaults(build_yaml.read_text())
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
+        tmp.write(resolved)
+        tmp_path = tmp.name
     try:
+        cmd = [str(ogx_bin), "stack", "list-deps", tmp_path]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error executing command: {e}")
         print(f"Command output: {e.output}")
         print(f"Command stderr: {e.stderr}")
         sys.exit(1)
+    finally:
+        os.unlink(tmp_path)
 
     packages = []
     for line in result.stdout.splitlines():
@@ -264,6 +287,62 @@ def generate_requirements_file(dependencies, ogx_reqs: OgxRequirements, otel_pac
     print(f"Successfully generated {output_path}")
 
 
+def generate_config_labels(version: str) -> str:
+    """Generate OCI LABEL instruction with base64-encoded config.yaml."""
+    config_path = Path("distribution/config.yaml")
+    if not config_path.exists():
+        print(f"Error: {config_path} not found")
+        sys.exit(1)
+
+    encoded = base64.b64encode(config_path.read_bytes()).decode("ascii")
+
+    labels = [
+        ("com.ogx.config.config.yaml", encoded),
+        ("com.ogx.distribution.name", "rh"),
+        ("com.ogx.distribution.version", version),
+        ("com.ogx.distribution.default-config", "config.yaml"),
+        ("com.ogx.distribution.configs", "config.yaml"),
+        ("org.opencontainers.image.title", "OGX - rh"),
+        ("org.opencontainers.image.version", version),
+    ]
+
+    first = f'LABEL {labels[0][0]}="{labels[0][1]}" \\'
+    rest = [f'  {k}="{v}"' for k, v in labels[1:]]
+    return first + "\n" + " \\\n".join(rest)
+
+
+def generate_containerfile(version: str):
+    """Generate Containerfile from template with OCI config labels."""
+    template_path = Path("Containerfile.in")
+    output_path = Path("Containerfile")
+
+    if not template_path.exists():
+        print(f"Error: Template file {template_path} not found")
+        sys.exit(1)
+
+    template_content = template_path.read_text()
+    placeholder_count = template_content.count("{config_labels}")
+    if placeholder_count != 1:
+        print(
+            f"Error: Containerfile.in must contain exactly one '{{config_labels}}' placeholder, found {placeholder_count}"
+        )
+        sys.exit(1)
+
+    warning = (
+        "# WARNING: This file is auto-generated from Containerfile.in\n"
+        "# by build/build.py - do not edit manually.\n"
+    )
+
+    # Use str.replace() to avoid format string injection from label content
+    containerfile_content = warning + template_content
+    containerfile_content = containerfile_content.replace(
+        "{config_labels}", generate_config_labels(version)
+    )
+
+    output_path.write_text(containerfile_content)
+    print(f"Successfully generated {output_path}")
+
+
 def main():
     ogx_reqs = _get_ogx_requirements()
 
@@ -287,6 +366,12 @@ def main():
 
     print("Generating requirements.txt...")
     generate_requirements_file(dependencies, ogx_reqs, otel_packages)
+
+    env = _load_env(Path(__file__).parent / "build.env")
+    version = _validate_version(os.getenv("OGX_VERSION") or env["OGX_VERSION"])
+
+    print("Generating Containerfile...")
+    generate_containerfile(version)
 
     print("Done!")
 

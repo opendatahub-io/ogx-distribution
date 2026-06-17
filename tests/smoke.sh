@@ -66,6 +66,11 @@ function start_and_wait_for_ogx_container {
     )
   fi
 
+  # Only add Anthropic configuration if ANTHROPIC_API_KEY is set
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    docker_args+=(--env "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
+  fi
+
   docker_args+=(--name ogx "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
 
   # Start ogx
@@ -120,6 +125,38 @@ function test_model_openai_inference {
     echo "Response: $resp"
     echo "Container logs:"
     docker logs ogx || true
+    return 1
+  fi
+}
+
+function test_messages_basic {
+  validate_model_parameter "$1"
+  local model="$1"
+  echo "===> Testing Messages API (/v1/messages) single-turn request for model $model..."
+  # Anthropic-compatible Messages API. The anthropic-version header is required.
+  resp=$(curl -fsS "$OGX_BASE_URL/v1/messages" \
+    -H "Content-Type: application/json" \
+    -H "anthropic-version: 2023-06-01" \
+    -d "{\"model\": \"$model\", \"max_tokens\": 128, \"messages\": [{\"role\": \"user\", \"content\": \"What is 2+2? Reply with just the number.\"}]}")
+
+  # Validate the Anthropic response shape: a `message` from the `assistant`
+  # containing at least one non-empty text block.
+  if echo "$resp" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+assert data.get("type") == "message", "type=" + repr(data.get("type"))
+assert data.get("role") == "assistant", "role=" + repr(data.get("role"))
+content = data.get("content") or []
+text_blocks = [b for b in content if b.get("type") == "text" and b.get("text")]
+assert text_blocks, "no non-empty text blocks: " + repr(content)
+'; then
+    echo "===> Messages API is working :)"
+    return 0
+  else
+    echo "===> Messages API is not working :("
+    echo "Response: $resp"
+    echo "Container logs:"
+    docker logs ogx 2>/dev/null | tail -50 || true
     return 1
   fi
 }
@@ -213,7 +250,35 @@ function test_file_processor_pypdf {
   return 0
 }
 
+function wait_for_ogx_health {
+  echo "Waiting for OGX server..."
+  for i in {1..60}; do
+    if [ "$(curl -fsS "$OGX_BASE_URL/v1/health" 2>/dev/null)" == '{"status":"OK"}' ]; then
+      echo "OGX server is up!"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "OGX server failed to become healthy :("
+  docker logs ogx 2>/dev/null | tail -50 || true
+  return 1
+}
+
 main() {
+  # Messages-only mode: the container is already running (started elsewhere,
+  # e.g. the setup-server action). Run just the Messages API smoke against
+  # MESSAGES_SMOKE_MODEL and exit. Used by the messages-openai.yml workflow.
+  if [ "${MESSAGES_SMOKE_ONLY:-false}" == "true" ]; then
+    echo "===> Running Messages API smoke only (model: ${MESSAGES_SMOKE_MODEL:-<unset>})..."
+    wait_for_ogx_health || exit 1
+    if test_messages_basic "${MESSAGES_SMOKE_MODEL:-}"; then
+      echo "===> Messages API smoke completed successfully!"
+      return 0
+    fi
+    echo "===> Messages API smoke failed!"
+    exit 1
+  fi
+
   echo "===> Starting smoke test..."
   start_and_wait_for_ogx_container
 
@@ -259,6 +324,15 @@ main() {
       echo "===> GEMINI_API_KEY is not set, skipping Gemini models"
     fi
 
+    # Only include Anthropic models if ANTHROPIC_API_KEY is set
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+      echo "===> ANTHROPIC_API_KEY is set, including Anthropic models in tests"
+      models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
+      inference_models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
+    else
+      echo "===> ANTHROPIC_API_KEY is not set, skipping Anthropic models"
+    fi
+
     echo "===> Testing model list for all models..."
     for model in "${models_to_test[@]}"; do
       if ! test_model_list "$model"; then
@@ -272,6 +346,18 @@ main() {
         failed_checks+=("inference:$model")
       fi
     done
+
+    # Basic Messages API (/v1/messages) smoke against the vLLM model.
+    # Skipped on MaaS: the RHOAI 3scale (apicast) gateway only exposes
+    # /v1/chat/completions and returns 403 "No Mapping Rule matched" for
+    # /v1/messages, so native passthrough cannot succeed through it. Native
+    # passthrough is covered deterministically against a local vLLM by
+    # messages-vllm.yml; OpenAI translation by messages-openai.yml.
+    if [ "${USING_MAAS:-false}" == "true" ]; then
+      echo "===> Skipping Messages API smoke (MaaS gateway has no /v1/messages route)"
+    elif ! test_messages_basic "$VLLM_INFERENCE_MODEL"; then
+      failed_checks+=("messages:$VLLM_INFERENCE_MODEL")
+    fi
 
     # Verify PostgreSQL tables and data
     if ! test_postgres_tables_exist; then
