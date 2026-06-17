@@ -1,6 +1,9 @@
 name: Test Upstream in Showroom
 
 on:
+  push:
+    branches:
+      - ntsh
   schedule:
     - cron: '0 2 * * *'  # daily at 02:00 UTC
   workflow_dispatch:
@@ -95,39 +98,31 @@ jobs:
       - name: Debug - Capture OpenShift state
         if: always()
         run: |
-          echo -e "\n=== Recent Events ==="
+          echo -e "\n=== OGXServer CR ==="
+          oc get ogxservers -n redhat-ods-applications -o yaml || echo "No OGXServer CR found"
+
+          echo -e "\n=== Deployments ==="
+          oc get deployments -n redhat-ods-applications -o wide
+
+          echo -e "\n=== All Pods ==="
+          oc get pods -n redhat-ods-applications -o wide
+
+          echo -e "\n=== Recent Events (last 50) ==="
           oc get events -n redhat-ods-applications --sort-by='.lastTimestamp' \
-            -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message
+            -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message \
+            | tail -50
 
-          echo -e "\n=== All Resources ==="
-          oc get all -n redhat-ods-applications
+          echo -e "\n=== Operator Logs (last 200 lines) ==="
+          oc logs -n redhat-ods-applications -l app.kubernetes.io/name=ogx-k8s-operator --tail=200 || echo "No operator logs"
 
-          echo -e "\n=== Pod Logs (first 5 lines) ==="
-          oc logs -n redhat-ods-applications -l app=ogx --tail=-1 | head -5 || echo "No logs available"
+          echo -e "\n=== Kyverno Policies ==="
+          oc get clusterpolicy -o wide || echo "No policies"
 
-          echo -e "\n=== Pod Logs (last 150 lines) ==="
-          oc logs -n redhat-ods-applications --tail=150 -l app=ogx || echo "No logs available"
+          echo -e "\n=== Kyverno Policy Reports ==="
+          oc get policyreport,clusterpolicyreport -A 2>/dev/null || echo "No policy reports"
 
-      - name: Notify Slack on failure
-        if: failure()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
-          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          FAILED_STEP="unknown"
-          if [[ "${{ steps.build.outcome }}" == "failure" ]]; then FAILED_STEP="Build image"
-          elif [[ "${{ steps.setup.outcome }}" == "failure" ]]; then FAILED_STEP="Setup CI environment"
-          elif [[ "${{ steps.push.outcome }}" == "failure" ]]; then FAILED_STEP="Push image to OpenShift registry"
-          elif [[ "${{ steps.run-setup.outcome }}" == "failure" ]]; then FAILED_STEP="Run setup.sh"
-          elif [[ "${{ steps.provision.outcome }}" == "failure" ]]; then FAILED_STEP="Run provision.sh"
-          elif [[ "${{ steps.tests.outcome }}" == "failure" ]]; then FAILED_STEP="Run tests"
-          fi
-
-          TEXT=$(printf '%s\n%s\n%s' \
-            ":failed: *Upstream CI failed on showroom*" \
-            "Failed step: ${FAILED_STEP}" \
-            "<${WORKFLOW_URL}|View workflow run>")
-          bash ogx-distribution/.github/actions/notify-slack/notify.sh "$TEXT" "#d00000"
+          echo -e "\n=== OGX Pod Logs (last 150 lines) ==="
+          oc logs -n redhat-ods-applications --tail=150 -l app=ogx || echo "No OGX pod logs"
 
       - name: Run unprovision.sh
         if: always()
