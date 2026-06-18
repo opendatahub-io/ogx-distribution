@@ -72,6 +72,12 @@ The OGX version is set in `build/build.env` (`OGX_VERSION`). The build script (`
 - **Tekton** (`.tekton/`) — Konflux/RHOAI downstream build pipelines.
 - **`create-or-update-release-branch.yml`** — creates/updates `release-*` release branches.
 
+## PR Title Format
+
+PR titles must use [Conventional Commits](https://www.conventionalcommits.org/) format (`<type>(<optional scope>): <description>`), enforced by `semantic-pr.yml`.
+
+Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
+
 ## Important Notes
 
 - Python version: 3.12
