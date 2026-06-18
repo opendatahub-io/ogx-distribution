@@ -48,6 +48,9 @@
 
 set -euo pipefail
 
+# Force SHELL=bash to prevent Bruno's shell-env from spawning fish (hangs on bash -ilc syntax)
+export SHELL=/bin/bash
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 OGX_IMAGE="${OGX_IMAGE:-quay.io/rhoai/odh-ogx-core-rhel9:rhoai-3.5-ea.2}"
@@ -485,11 +488,16 @@ discover_embedding_model() {
     EMBEDDING_MODEL=$(python3 -c "
 import json, sys
 data = json.loads(sys.stdin.read())
+candidates = []
 for m in data.get('data', []):
     meta = m.get('custom_metadata', {}) or {}
     if meta.get('model_type') == 'embedding':
-        print(m['id']); sys.exit(0)
-print('')
+        candidates.append(m['id'])
+# Prefer vllm-embedding provider (remote, always works) over sentence-transformers (local-only)
+for c in candidates:
+    if c.startswith('vllm-embedding/'):
+        print(c); sys.exit(0)
+print(candidates[0] if candidates else '')
 " <<< "$response")
 
     if [[ -z "$EMBEDDING_MODEL" ]]; then

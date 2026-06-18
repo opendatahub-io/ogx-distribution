@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+# Prevent Bruno's shell-env from spawning interactive login shells (hangs when .bashrc execs fish)
+export SHELL=/bin/bash
+export BRUNO_SKIP_SHELL_ENV=1
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BRUNO_DIR="${REPO_ROOT}/bruno"
 NOTEBOOKS_DIR="${REPO_ROOT}/notebooks"
@@ -134,7 +138,9 @@ if [[ -n "${BRU}" && -d "${OGX_CRUD_DIR}" ]]; then
   _bruno_exit=0
   BRUNO_TIMEOUT="${BRUNO_TIMEOUT:-600}"
   # shellcheck disable=SC2086
-  (cd "${OGX_CRUD_DIR}" && timeout "${BRUNO_TIMEOUT}" $BRU run . -r "${_env_vars[@]}" --output "${_bruno_json}") \
+  # SHELL=bash prevents Bruno's shell-env from spawning the user's login shell (e.g. fish)
+  # which can hang when it receives bash -ilc syntax
+  (cd "${OGX_CRUD_DIR}" && SHELL=/bin/bash timeout "${BRUNO_TIMEOUT}" $BRU run . -r "${_env_vars[@]}" --output "${_bruno_json}") \
     > "${_bruno_log}" 2>&1 || _bruno_exit=$?
   if [[ $_bruno_exit -eq 124 ]]; then
     echo "  Bruno CRUD tests timed out after ${BRUNO_TIMEOUT}s"
