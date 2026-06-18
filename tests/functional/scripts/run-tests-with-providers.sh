@@ -174,6 +174,7 @@ if [[ -d "$NOTEBOOKS_DIR" ]]; then
   fi
   echo ">>> Phase 2: Notebooks — pytest"
   export BASE_URL INFERENCE_MODEL FILES_PROVIDER INFERENCE_PROVIDER VECTOR_IO_PROVIDER EMBEDDING_MODEL
+  export MODEL="${INFERENCE_MODEL}"
   export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
   if ! (cd "$REPO_ROOT" && uv run pytest tests/test_notebooks.py -v --tb=short --junitxml="${REPORTS_DIR}/notebooks.xml"); then
     EXIT_CODE=1
