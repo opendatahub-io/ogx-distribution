@@ -1028,7 +1028,7 @@ wheels = [
 [[package]]
 name = "ogx-functional-tests"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "ipykernel" },
     { name = "mcp" },
