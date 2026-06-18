@@ -108,27 +108,6 @@ jobs:
           echo -e "\n=== Pod Logs (last 150 lines) ==="
           oc logs -n redhat-ods-applications --tail=150 -l app=ogx || echo "No logs available"
 
-      - name: Notify Slack on failure
-        if: failure()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
-          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          FAILED_STEP="unknown"
-          if [[ "${{ steps.build.outcome }}" == "failure" ]]; then FAILED_STEP="Build image"
-          elif [[ "${{ steps.setup.outcome }}" == "failure" ]]; then FAILED_STEP="Setup CI environment"
-          elif [[ "${{ steps.push.outcome }}" == "failure" ]]; then FAILED_STEP="Push image to OpenShift registry"
-          elif [[ "${{ steps.run-setup.outcome }}" == "failure" ]]; then FAILED_STEP="Run setup.sh"
-          elif [[ "${{ steps.provision.outcome }}" == "failure" ]]; then FAILED_STEP="Run provision.sh"
-          elif [[ "${{ steps.tests.outcome }}" == "failure" ]]; then FAILED_STEP="Run tests"
-          fi
-
-          TEXT=$(printf '%s\n%s\n%s' \
-            ":failed: *Upstream CI failed on showroom*" \
-            "Failed step: ${FAILED_STEP}" \
-            "<${WORKFLOW_URL}|View workflow run>")
-          bash ogx-distribution/.github/actions/notify-slack/notify.sh "$TEXT" "#d00000"
-
       - name: Run unprovision.sh
         if: always()
         run: |
