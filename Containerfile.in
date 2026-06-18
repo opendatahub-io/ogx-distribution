@@ -7,8 +7,9 @@ COPY distribution/requirements.txt ${APP_ROOT}/requirements.txt
 RUN uv pip install --constraint ${APP_ROOT}/constraints.txt -r ${APP_ROOT}/requirements.txt
 
 COPY --chmod=755 distribution/install-common.sh ${APP_ROOT}/install-common.sh
+ENV DOCLING_ARTIFACTS_PATH="${APP_ROOT}/.cache/docling/models"
 RUN ${APP_ROOT}/install-common.sh
-ENV TIKTOKEN_CACHE_DIR="${HOME}/.cache/tiktoken"
+ENV TIKTOKEN_CACHE_DIR="${APP_ROOT}/.cache/tiktoken"
 
 {config_labels}
 
