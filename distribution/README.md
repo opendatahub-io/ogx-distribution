@@ -4,14 +4,18 @@
 
 This image contains the official Open Data Hub OGX distribution, with all the packages and configuration needed to run an OGX server in a containerized environment.
 
-The image is currently shipping with the Open Data Hub version of OGX version [1.1.0+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.1.0+rhaiv.0)
+The image is currently shipping with the Open Data Hub version of OGX version [1.1.2+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.1.2+rhaiv.0)
 
 You can see an overview of the APIs and Providers the image ships with in the table below.
 
 | API | Provider | External? | Enabled by default? | How to enable |
 |-----|----------|-----------|---------------------|---------------|
 | batches | inline::reference | No | ✅ | N/A |
-| file_processors | inline::pypdf | No | ✅ | N/A |
+| file_processors | inline::auto | No | ✅ | N/A |
+| file_processors | inline::docling | No | Dependency only* | Requires a custom `config.yaml` |
+| file_processors | inline::markitdown | No | Dependency only* | Requires a custom `config.yaml` |
+| file_processors | inline::pypdf | No | Dependency only* | Requires a custom `config.yaml` |
+| file_processors | remote::docling-serve | No | Dependency only* | Requires a custom `config.yaml` |
 | files | inline::localfs | No | ✅ | N/A |
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | Dependency only* | Requires a custom `config.yaml` |

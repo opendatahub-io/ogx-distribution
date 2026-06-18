@@ -9,6 +9,7 @@ pull_request_rules:
       - or:
           - base=main
           - base~=^rhoai-v
+          - base~=^release-
       - label!=do-not-merge
       - label!=needs-rebase
       - check-success=pre-commit
@@ -35,6 +36,7 @@ pull_request_rules:
       - or:
           - base=main
           - base~=^rhoai-v
+          - base~=^release-
       - label!=do-not-merge
       - label!=needs-rebase
       - check-success=pre-commit
