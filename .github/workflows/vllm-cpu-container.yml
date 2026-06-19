@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rhoai-v*
+      - release-*
       - konflux-poc*
     types:
       - opened
@@ -17,6 +18,7 @@ on:
     branches:
       - main
       - rhoai-v*
+      - release-*
     paths:
       - 'vllm/Containerfile'
       - '.github/actions/**'

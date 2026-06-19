@@ -99,10 +99,12 @@ function main() {
     echo "  VERTEX_AI_INFERENCE_MODEL: $VERTEX_AI_INFERENCE_MODEL"
     echo "  OPENAI_INFERENCE_MODEL: $OPENAI_INFERENCE_MODEL"
     echo "  GEMINI_INFERENCE_MODEL: ${GEMINI_INFERENCE_MODEL:-<not set>}"
+    echo "  ANTHROPIC_INFERENCE_MODEL: ${ANTHROPIC_INFERENCE_MODEL:-<not set>}"
     echo "  EMBEDDING_MODEL: $EMBEDDING_MODEL"
     echo "  VERTEX_AI_PROJECT: ${VERTEX_AI_PROJECT:-<not set>}"
     echo "  OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
     echo "  GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}"
+    echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+<set>}"
 
     clone_ogx
 
@@ -132,6 +134,14 @@ function main() {
         models_to_test+=("$GEMINI_INFERENCE_MODEL")
     else
         echo "GEMINI_API_KEY is not set, skipping Gemini models"
+    fi
+
+    # Only include Anthropic models if ANTHROPIC_API_KEY is set
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+        echo "ANTHROPIC_API_KEY is set, including Anthropic models in tests"
+        models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
+    else
+        echo "ANTHROPIC_API_KEY is not set, skipping Anthropic models"
     fi
 
     for model in "${models_to_test[@]}"; do

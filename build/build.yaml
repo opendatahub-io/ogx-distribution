@@ -27,11 +27,13 @@ providers:
       api_token: ${env.VLLM_EMBEDDING_API_TOKEN:=fake}
       tls_verify: ${env.VLLM_EMBEDDING_TLS_VERIFY:=true}
       refresh_models: ${env.VLLM_EMBEDDING_REFRESH_MODELS:=false}
-  - provider_id: ${env.AWS_BEARER_TOKEN_BEDROCK:+bedrock}
+  - provider_id: ${env.ENABLE_BEDROCK:+bedrock}
     provider_type: remote::bedrock
     config:
-      api_key: ${env.AWS_BEARER_TOKEN_BEDROCK:=}
+      aws_bedrock_bearer_token: ${env.AWS_BEDROCK_BEARER_TOKEN:=}
       region_name: ${env.AWS_DEFAULT_REGION:=us-east-2}
+      aws_role_arn: ${env.AWS_ROLE_ARN:=}
+      aws_web_identity_token_file: ${env.AWS_WEB_IDENTITY_TOKEN_FILE:=}
   - provider_id: sentence-transformers
     provider_type: inline::sentence-transformers
     config: {}
@@ -188,9 +190,23 @@ providers:
         backend: sql_default
         table_name: files_metadata
   file_processors:
+  - provider_id: auto
+    provider_type: inline::auto
+    config: {}
+  - provider_id: docling
+    provider_type: inline::docling
+    config: {}
+  - provider_id: markitdown
+    provider_type: inline::markitdown
+    config: {}
   - provider_id: pypdf
     provider_type: inline::pypdf
     config: {}
+  - provider_id: ${env.DOCLING_SERVE_URL:+docling-serve}
+    provider_type: remote::docling-serve
+    config:
+      base_url: ${env.DOCLING_SERVE_URL:=}
+      api_key: ${env.DOCLING_SERVE_API_KEY:=}
   batches:
   - provider_id: reference
     provider_type: inline::reference

@@ -66,6 +66,11 @@ function start_and_wait_for_ogx_container {
     )
   fi
 
+  # Only add Anthropic configuration if ANTHROPIC_API_KEY is set
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    docker_args+=(--env "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
+  fi
+
   docker_args+=(--name ogx "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
 
   # Start ogx
@@ -317,6 +322,15 @@ main() {
       inference_models_to_test+=("$GEMINI_INFERENCE_MODEL")
     else
       echo "===> GEMINI_API_KEY is not set, skipping Gemini models"
+    fi
+
+    # Only include Anthropic models if ANTHROPIC_API_KEY is set
+    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+      echo "===> ANTHROPIC_API_KEY is set, including Anthropic models in tests"
+      models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
+      inference_models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
+    else
+      echo "===> ANTHROPIC_API_KEY is not set, skipping Anthropic models"
     fi
 
     echo "===> Testing model list for all models..."

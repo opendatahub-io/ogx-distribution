@@ -141,8 +141,8 @@ Testing is automated via GitHub Actions workflows in `.github/workflows/`.
 
 The main CI pipeline that builds, tests, and publishes the container image. It runs on:
 
-- **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `distribution/`, `Containerfile`, `tests/`, or workflow files change)
-- **Pushes** to `main` and `rhoai-v*` branches
+- **Pull requests** to `main`, `rhoai-v*`, `release-*`, and `konflux-poc*` branches (when `distribution/`, `Containerfile`, `tests/`, or workflow files change)
+- **Pushes** to `main`, `rhoai-v*`, and `release-*` branches
 - **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits
 - **Nightly schedule** (6 AM UTC) to test the `main` branch of ogx
 
@@ -154,7 +154,7 @@ Pipeline steps:
 4. **Start PostgreSQL** via the `setup-postgres` action
 5. **Run smoke tests** (`tests/smoke.sh`)
 6. **Run integration tests** (`tests/run_integration_tests.sh`)
-7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `distribution/` or `Containerfile` changed, or on manual dispatch)
+7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main`, `rhoai-v*`, or `release-*` branches when `distribution/` or `Containerfile` changed, or on manual dispatch)
 8. **Notify Slack** on failure or successful publish
 
 Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
@@ -213,7 +213,7 @@ Triggered via `repository_dispatch` (type: `update-ogx-version`) from the openda
 
 Builds, tests, and publishes pre-built vLLM CPU container images to `quay.io/opendatahub/vllm-cpu`. These images bundle inference and embedding models so the main CI pipeline doesn't need to download them each run. It runs on:
 
-- **Pull requests** to `main`/`rhoai-v*`/`konflux-poc*` branches and **pushes** to `main`/`rhoai-v*` branches (when `vllm/Containerfile` or actions change)
+- **Pull requests** to `main`/`rhoai-v*`/`release-*`/`konflux-poc*` branches and **pushes** to `main`/`rhoai-v*`/`release-*` branches (when `vllm/Containerfile` or actions change)
 - **Manual dispatch** with optional custom inference/embedding model parameters
 
 ### Test PR in Showroom (`test-pr-in-showroom.yml`)

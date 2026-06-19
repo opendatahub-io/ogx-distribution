@@ -7,6 +7,7 @@
 
 # Usage: ./build/build.py
 
+import base64
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,10 @@ STRIPPED_PROVIDER_TYPES = {
     "inline::sentence-transformers",
     "inline::milvus",
     "inline::faiss",
+    "inline::docling",
+    "inline::markitdown",
+    "inline::pypdf",
+    "remote::docling-serve",
 }
 
 STRIPPED_CONFIG_HEADER = (
@@ -258,7 +263,13 @@ def get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
     packages = []
     for line in result.stdout.splitlines():
         line = line.strip()
-        if line and "opentelemetry-instrumentation-botocore" not in line:
+        if line and not any(
+            pkg in line
+            for pkg in (
+                "opentelemetry-instrumentation-botocore",
+                "opentelemetry-instrumentation-system-metrics",
+            )
+        ):
             packages.append(line)
     return packages
 
@@ -279,6 +290,62 @@ def generate_requirements_file(dependencies, ogx_reqs: OgxRequirements, otel_pac
     with open(output_path, "w") as f:
         f.write("\n".join(lines) + "\n")
 
+    print(f"Successfully generated {output_path}")
+
+
+def generate_config_labels(version: str) -> str:
+    """Generate OCI LABEL instruction with base64-encoded config.yaml."""
+    config_path = Path("distribution/config.yaml")
+    if not config_path.exists():
+        print(f"Error: {config_path} not found")
+        sys.exit(1)
+
+    encoded = base64.b64encode(config_path.read_bytes()).decode("ascii")
+
+    labels = [
+        ("com.ogx.config.config.yaml", encoded),
+        ("com.ogx.distribution.name", "rh"),
+        ("com.ogx.distribution.version", version),
+        ("com.ogx.distribution.default-config", "config.yaml"),
+        ("com.ogx.distribution.configs", "config.yaml"),
+        ("org.opencontainers.image.title", "OGX - rh"),
+        ("org.opencontainers.image.version", version),
+    ]
+
+    first = f'LABEL {labels[0][0]}="{labels[0][1]}" \\'
+    rest = [f'  {k}="{v}"' for k, v in labels[1:]]
+    return first + "\n" + " \\\n".join(rest)
+
+
+def generate_containerfile(version: str):
+    """Generate Containerfile from template with OCI config labels."""
+    template_path = Path("Containerfile.in")
+    output_path = Path("Containerfile")
+
+    if not template_path.exists():
+        print(f"Error: Template file {template_path} not found")
+        sys.exit(1)
+
+    template_content = template_path.read_text()
+    placeholder_count = template_content.count("{config_labels}")
+    if placeholder_count != 1:
+        print(
+            f"Error: Containerfile.in must contain exactly one '{{config_labels}}' placeholder, found {placeholder_count}"
+        )
+        sys.exit(1)
+
+    warning = (
+        "# WARNING: This file is auto-generated from Containerfile.in\n"
+        "# by build/build.py - do not edit manually.\n"
+    )
+
+    # Use str.replace() to avoid format string injection from label content
+    containerfile_content = warning + template_content
+    containerfile_content = containerfile_content.replace(
+        "{config_labels}", generate_config_labels(version)
+    )
+
+    output_path.write_text(containerfile_content)
     print(f"Successfully generated {output_path}")
 
 
@@ -305,6 +372,12 @@ def main():
 
     print("Generating requirements.txt...")
     generate_requirements_file(dependencies, ogx_reqs, otel_packages)
+
+    env = _load_env(Path(__file__).parent / "build.env")
+    version = _validate_version(os.getenv("OGX_VERSION") or env["OGX_VERSION"])
+
+    print("Generating Containerfile...")
+    generate_containerfile(version)
 
     print("Done!")
 

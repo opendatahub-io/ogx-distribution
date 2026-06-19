@@ -2,9 +2,13 @@
 # by build/build.py - do not edit manually.
 #
 # Stripped provider types (dependency only - available via custom config.yaml):
+#   - inline::docling
 #   - inline::faiss
+#   - inline::markitdown
 #   - inline::milvus
+#   - inline::pypdf
 #   - inline::sentence-transformers
+#   - remote::docling-serve
 version: 2
 image_name: rh
 apis:
@@ -34,11 +38,13 @@ providers:
       api_token: ${env.VLLM_EMBEDDING_API_TOKEN:=fake}
       tls_verify: ${env.VLLM_EMBEDDING_TLS_VERIFY:=true}
       refresh_models: ${env.VLLM_EMBEDDING_REFRESH_MODELS:=false}
-  - provider_id: ${env.AWS_BEARER_TOKEN_BEDROCK:+bedrock}
+  - provider_id: ${env.ENABLE_BEDROCK:+bedrock}
     provider_type: remote::bedrock
     config:
-      api_key: ${env.AWS_BEARER_TOKEN_BEDROCK:=}
+      aws_bedrock_bearer_token: ${env.AWS_BEDROCK_BEARER_TOKEN:=}
       region_name: ${env.AWS_DEFAULT_REGION:=us-east-2}
+      aws_role_arn: ${env.AWS_ROLE_ARN:=}
+      aws_web_identity_token_file: ${env.AWS_WEB_IDENTITY_TOKEN_FILE:=}
   - provider_id: ${env.WATSONX_API_KEY:+watsonx}
     provider_type: remote::watsonx
     config:
@@ -178,8 +184,8 @@ providers:
         backend: sql_default
         table_name: files_metadata
   file_processors:
-  - provider_id: pypdf
-    provider_type: inline::pypdf
+  - provider_id: auto
+    provider_type: inline::auto
     config: {}
   batches:
   - provider_id: reference
