@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rhoai-v*
+      - release-*
       - konflux-poc*
     types:
       - opened
@@ -12,13 +13,16 @@ on:
     paths:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
+      - 'build/**'
       - 'Containerfile'
+      - 'Containerfile.in'
       - 'distribution/**'
       - 'tests/**'
   push:
     branches:
       - main
       - rhoai-v*
+      - release-*
 
   # build a custom image from an arbitrary ogx commit
   # NOTE: workflow_dispatch intentionally skips all tests (vllm setup, postgres setup, smoke tests, integration tests)
@@ -63,11 +67,13 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
       VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
       VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
+      ANTHROPIC_INFERENCE_MODEL: anthropic/claude-sonnet-4-6
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
@@ -124,6 +130,13 @@ jobs:
           cache-from: type=gha,scope=build-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
 
+      - name: Verify OCI config labels
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
+        run: |
+          ./tests/verify-config-label.sh "$IMAGE_TAG"
+
       - name: Validate provider credentials
         env:
           _MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
@@ -132,7 +145,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
               echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
-              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; } >> "$GITHUB_ENV"
               exit 0
             fi
           fi
@@ -166,6 +179,20 @@ jobs:
           if [ -z "$VERTEX_AI_PROJECT" ] || [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
             echo "::warning::Vertex AI credentials not configured, skipping Vertex AI tests"
             { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; } >> "$GITHUB_ENV"
+          fi
+
+          # Anthropic: validate key with a lightweight call
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              -H "x-api-key: $ANTHROPIC_API_KEY" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"claude-sonnet-4-6","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
+              https://api.anthropic.com/v1/messages)
+            if [ "$status" != "200" ]; then
+              echo "::warning::Anthropic API returned HTTP $status, skipping Anthropic tests"
+              echo "ANTHROPIC_API_KEY=" >> "$GITHUB_ENV"
+            fi
           fi
 
           # MaaS vLLM: presence check
@@ -367,6 +394,16 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
+      - name: Compute branch-specific image tag
+        if: github.event_name == 'push'
+        run: |
+          if [[ "$GITHUB_REF" == refs/heads/rhoai-v* ]]; then
+            echo "BRANCH_TAG=${GITHUB_REF_NAME}-latest" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/heads/release-* ]]; then
+            version="${GITHUB_REF_NAME#release-}"
+            echo "BRANCH_TAG=rhoai-v${version}-latest" >> "$GITHUB_ENV"
+          fi
+
       - name: Publish multi-arch image to Quay.io
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
@@ -374,7 +411,7 @@ jobs:
           file: Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
+          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (env.BRANCH_TAG != '' && format(',{0}:{1}', env.IMAGE_NAME, env.BRANCH_TAG)) || '') }}
           cache-from: |
             type=gha,scope=build-amd64
             type=gha,scope=build-arm64

@@ -47,7 +47,7 @@ Various tags are maintained for this image:
 
 - `latest` will always point to the latest image that has been built off of a merge to the `main` branch
   - You can also pull an older image built off of `main` by using the SHA of the merge commit as the tag
-- `rhoai-v*-latest` will always point to the latest image that has been built off of a merge to the corresponding `rhoai-v*` branch
+- `rhoai-v*-latest` will always point to the latest image that has been built off of a merge to the corresponding `rhoai-v*` or `release-*` branch (e.g., a push to `release-3.5-ea.2` produces the tag `rhoai-v3.5-ea.2-latest`)
 
 You can see the source code that implements this build strategy [here](.github/workflows/redhat-distro-container.yml)
 
