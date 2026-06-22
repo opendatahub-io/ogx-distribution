@@ -158,6 +158,7 @@ def generate_stripped_config():
     ryaml = YAML()
     ryaml.preserve_quotes = True
     ryaml.width = 4096
+    ryaml.indent(sequence=4, offset=2)
 
     with open(build_path, "r") as f:
         config = ryaml.load(f)
@@ -263,7 +264,13 @@ def get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
     packages = []
     for line in result.stdout.splitlines():
         line = line.strip()
-        if line and "opentelemetry-instrumentation-botocore" not in line:
+        if line and not any(
+            pkg in line
+            for pkg in (
+                "opentelemetry-instrumentation-botocore",
+                "opentelemetry-instrumentation-system-metrics",
+            )
+        ):
             packages.append(line)
     return packages
 
