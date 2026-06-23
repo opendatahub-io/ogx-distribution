@@ -1,4 +1,14 @@
 pull_request_rules:
+  - name: keep PRs up to date with main
+    conditions:
+      - -conflict
+      - -draft
+      - -closed
+      - -merged
+      - label!=do-not-merge
+    actions:
+      update: {}
+
   - name: auto-merge github-deps
     description: >
       Automatic merge of dependency update PRs (single approval required)
