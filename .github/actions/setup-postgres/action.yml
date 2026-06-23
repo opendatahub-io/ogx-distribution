@@ -31,3 +31,7 @@ runs:
           docker logs postgres || true
           exit 1
         fi
+
+        # Enable pgvector extension (image ships the .so, but the DB needs CREATE EXTENSION)
+        docker exec postgres psql -U ogx -d ogx -c "CREATE EXTENSION IF NOT EXISTS vector;"
+        echo "pgvector extension enabled"
