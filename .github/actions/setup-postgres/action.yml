@@ -32,6 +32,14 @@ runs:
           exit 1
         fi
 
-        # Enable pgvector extension (image ships the .so, but the DB needs CREATE EXTENSION)
-        docker exec postgres psql -U ogx -d ogx -c "CREATE EXTENSION IF NOT EXISTS vector;"
-        echo "pgvector extension enabled"
+        # Enable pgvector extension (image ships the .so, but the DB needs CREATE EXTENSION).
+        # pg_isready returns true before the database is fully initialized, so retry.
+        echo "Enabling pgvector extension..."
+        for i in {1..10}; do
+          if docker exec postgres psql -U ogx -d ogx -c "CREATE EXTENSION IF NOT EXISTS vector;" 2>/dev/null; then
+            echo "pgvector extension enabled"
+            break
+          fi
+          echo "Attempt $i: database not ready for CREATE EXTENSION, retrying..."
+          sleep 1
+        done
