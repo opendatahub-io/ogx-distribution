@@ -256,6 +256,42 @@ function test_file_processor_pypdf {
   return 0
 }
 
+function test_file_processor_encrypted_pdf {
+  echo "===> Verifying file processor handles owner-encrypted PDFs..."
+
+  # Same marker as sample.pdf — the PDF is owner-encrypted (restricts
+  # printing/copying) but requires no password to read. pypdf can extract
+  # text from these. This test catches blanket is_encrypted rejections
+  # like upstream ogx-ai/ogx#5670 / RHAIENG-5857.
+  local expected_marker="OGX-RAG-SMOKE-7f3a9c2e8b1d4f06"
+  local pdf_path="$SCRIPT_DIR/fixtures/sample-encrypted.pdf"
+  if [ ! -f "$pdf_path" ]; then
+    echo "===> Encrypted sample PDF not found at $pdf_path, skipping"
+    return 0
+  fi
+
+  resp=$(curl -sS -w "\n%{http_code}" "$OGX_BASE_URL/v1alpha/file-processors/process" -F "file=@$pdf_path;type=application/pdf")
+  http_code=$(echo "$resp" | tail -1)
+  body=$(echo "$resp" | sed '$d')
+  echo "Response ($http_code): $body"
+
+  if [ "$http_code" = "422" ] || [ "$http_code" = "400" ]; then
+    echo "===> Server rejected owner-encrypted PDF (HTTP $http_code) — is_encrypted blanket check is present :("
+    echo "===> See: https://github.com/ogx-ai/ogx/issues/6181"
+    docker logs ogx 2>/dev/null | tail -20 || true
+    return 1
+  fi
+
+  if ! echo "$body" | grep -qF "$expected_marker"; then
+    echo "===> File processor did not extract expected marker from encrypted PDF :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+
+  echo "===> File processor handles owner-encrypted PDFs correctly :)"
+  return 0
+}
+
 function test_rag_file_ingestion {
   echo "===> Verifying RAG file ingestion pipeline (upload → vector store → index)..."
 
@@ -447,6 +483,10 @@ main() {
 
   if ! test_file_processor_pypdf; then
     failed_checks+=("file_processor:pypdf")
+  fi
+
+  if ! test_file_processor_encrypted_pdf; then
+    failed_checks+=("file_processor:encrypted_pdf")
   fi
 
   if ! test_rag_file_ingestion; then
