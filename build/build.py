@@ -293,9 +293,6 @@ def get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
     packages = []
     for line in result.stdout.splitlines():
         line = line.strip()
-<<<<<<< HEAD
-        if line and "opentelemetry-instrumentation-botocore" not in line:
-=======
         if line and not any(
             pkg in line
             for pkg in (
@@ -304,7 +301,6 @@ def get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
                 "opentelemetry-instrumentation-system-metrics",
             )
         ):
->>>>>>> c1c6a529 (fix: apply constraints.txt overrides to generated otel package versions)
             packages.append(line)
     return packages
 

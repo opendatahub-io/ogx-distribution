@@ -1,6 +1,6 @@
 # WARNING: This file is auto-generated from Containerfile.in
 # by build/build.py - do not edit manually.
-FROM quay.io/opendatahub/odh-midstream-python-base-3-12@sha256:3f165b49d6c3dc7ec5d1cccd8458b17b808f2929e8aa6d836de584836509d124
+FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
 
 ENV UV_INDEX_STRATEGY=unsafe-best-match
 
