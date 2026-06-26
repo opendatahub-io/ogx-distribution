@@ -10,14 +10,50 @@ get {
   auth: inherit
 }
 
-script:post-response {
+tests {
   test("Status is 200", function() {
     expect(res.getStatus()).to.eql(200);
   });
-  test("Response has data array with providers", function() {
+
+  test("Response has providers array", function() {
     const body = res.getBody();
     expect(body).to.have.property("data");
     expect(body.data).to.be.an("array");
     expect(body.data.length).to.be.greaterThan(0);
+  });
+
+  test("Configured inference provider is registered", function() {
+    const provider = bru.getEnvVar("inference_provider");
+    if (!provider) { return; }
+    const ids = res.getBody().data
+      .filter(p => p.api === "inference")
+      .map(p => p.provider_id);
+    expect(ids).to.include(provider);
+  });
+
+  test("Configured vector_io provider is registered", function() {
+    const provider = bru.getEnvVar("vector_io_provider");
+    if (!provider) { return; }
+    const ids = res.getBody().data
+      .filter(p => p.api === "vector_io")
+      .map(p => p.provider_id);
+    expect(ids).to.include(provider);
+  });
+
+  test("Configured files provider is registered", function() {
+    const provider = bru.getEnvVar("files_provider");
+    if (!provider) { return; }
+    const ids = res.getBody().data
+      .filter(p => p.api === "files")
+      .map(p => p.provider_id);
+    expect(ids).to.include(provider);
+  });
+
+  test("All providers have required fields", function() {
+    res.getBody().data.forEach(p => {
+      expect(p).to.have.property("api");
+      expect(p).to.have.property("provider_id");
+      expect(p).to.have.property("provider_type");
+    });
   });
 }

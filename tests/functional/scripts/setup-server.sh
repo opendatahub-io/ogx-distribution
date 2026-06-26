@@ -268,8 +268,6 @@ start_postgres() {
                 fi
                 echo -e "${GREEN}Database cleaned up.${NC}"
             fi
-            podman exec "$pg_name" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
-                -c "CREATE EXTENSION IF NOT EXISTS vector;" 2>/dev/null || true
             return 0
         fi
         if [[ $i -eq 30 ]]; then
@@ -350,7 +348,8 @@ start_ogx() {
             RUN_ARGS+=(-e "VLLM_EMBEDDING_API_TOKEN=${VLLM_EMBEDDING_API_TOKEN}")
         fi
 
-        # Default pgvector connection to the same Postgres instance if enabled
+        # pgvector enabled by default — we always start postgres
+        ENABLE_PGVECTOR="${ENABLE_PGVECTOR:-1}"
         if [[ -n "${ENABLE_PGVECTOR:-}" ]]; then
             PGVECTOR_HOST="${PGVECTOR_HOST:-${postgres_host}}"
             PGVECTOR_PORT="${PGVECTOR_PORT:-5432}"
@@ -450,13 +449,16 @@ discover_model() {
     }
 
     INFERENCE_MODEL=$(python3 -c "
-import json, sys
+import json, sys, os
 data = json.loads(sys.stdin.read())
-for m in data.get('data', []):
-    meta = m.get('custom_metadata', {}) or {}
-    if meta.get('model_type') != 'embedding':
-        print(m['id']); sys.exit(0)
-print('')
+prov = os.environ.get('INFERENCE_PROVIDER', '')
+candidates = [m['id'] for m in data.get('data', [])
+              if (m.get('custom_metadata') or {}).get('model_type') != 'embedding']
+if prov:
+    preferred = [c for c in candidates if c.startswith(prov + '/')]
+    print(preferred[0] if preferred else (candidates[0] if candidates else ''))
+else:
+    print(candidates[0] if candidates else '')
 " <<< "$response")
 
     if [[ -z "$INFERENCE_MODEL" ]]; then
@@ -649,9 +651,9 @@ case "$MODE" in
             exit 1
         fi
         echo -e "${GREEN}Found running OGX at ${BASE_URL}${NC}"
+        discover_providers
         discover_model
         discover_embedding_model
-        discover_providers
         run_tests
         ;;
 
@@ -665,9 +667,9 @@ case "$MODE" in
             start_vllm_embedding
         fi
         start_ogx
+        discover_providers
         discover_model
         discover_embedding_model
-        discover_providers
         print_status
         ;;
 
@@ -684,9 +686,9 @@ case "$MODE" in
             start_vllm_embedding
         fi
         start_ogx
+        discover_providers
         discover_model
         discover_embedding_model
-        discover_providers
         run_tests
         echo -e "${GREEN}All tests passed!${NC}"
         ;;

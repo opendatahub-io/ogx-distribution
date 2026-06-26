@@ -5,7 +5,7 @@ description = "Functional tests for OGX (Bruno + notebooks)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "ogx-client>=1.0.0",
+    "ogx-client~=1.1.0",
     "openai>=2.24.0",
     "mcp>=1.0.0",
     "pytest>=9.0.2",
