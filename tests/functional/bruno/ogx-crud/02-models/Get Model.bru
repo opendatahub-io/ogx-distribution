@@ -1,0 +1,22 @@
+meta {
+  name: Get Model
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/models/{{model}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has model identifier", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("identifier");
+    expect(body.identifier).to.be.a("string");
+  });
+}

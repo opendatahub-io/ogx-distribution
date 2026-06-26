@@ -1,0 +1,22 @@
+meta {
+  name: Get Response
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/responses/{{response_id}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has matching ID", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("id");
+    expect(body.id).to.eql(bru.getEnvVar("response_id"));
+  });
+}

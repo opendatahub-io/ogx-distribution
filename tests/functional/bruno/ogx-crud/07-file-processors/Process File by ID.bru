@@ -1,0 +1,38 @@
+meta {
+  name: Process File by ID
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1alpha/file-processors/process
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  file_id: {{fp_file_id}}
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has chunks array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("chunks");
+    expect(body.chunks).to.be.an("array");
+    expect(body.chunks.length).to.be.greaterThan(0);
+  });
+  test("First chunk has content string", function() {
+    const body = res.getBody();
+    expect(body.chunks[0]).to.have.property("content");
+    expect(body.chunks[0].content).to.be.a("string");
+  });
+  test("Chunk metadata references the file ID", function() {
+    const body = res.getBody();
+    const meta = body.chunks[0].metadata || {};
+    expect(meta).to.have.property("file_id");
+    expect(meta.file_id).to.eql(bru.getEnvVar("fp_file_id"));
+  });
+}
