@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# trigger CI
 set -uo pipefail
 
 # Source common test utilities
