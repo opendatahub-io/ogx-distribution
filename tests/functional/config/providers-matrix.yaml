@@ -1,0 +1,47 @@
+# Provider options per API, aligned with ogx-distribution
+# https://github.com/opendatahub-io/ogx-distribution/tree/main/distribution
+#
+# Use with run-tests-with-providers.sh: set FILES_PROVIDER, INFERENCE_PROVIDER,
+# VECTOR_IO_PROVIDER (and INFERENCE_MODEL) to run tests against a given combo.
+
+files:
+  - id: inline::localfs
+    provider_type: inline::localfs
+    description: Default local files (meta-reference-files)
+  - id: remote::s3
+    provider_type: remote::s3
+    description: S3-backed files (set ENABLE_S3, S3_* env on OGX)
+
+inference:
+  - id: remote::vllm
+    provider_type: remote::vllm
+    description: vLLM (set VLLM_URL on OGX)
+  - id: remote::bedrock
+    provider_type: remote::bedrock
+    description: AWS Bedrock (set AWS_BEARER_TOKEN_BEDROCK, AWS_DEFAULT_REGION)
+  - id: remote::azure
+    provider_type: remote::azure
+    description: Azure OpenAI (set AZURE_API_KEY, AZURE_API_BASE, etc.)
+  - id: remote::openai
+    provider_type: remote::openai
+    description: OpenAI (set OPENAI_API_KEY)
+  - id: remote::vertexai
+    provider_type: remote::vertexai
+    description: Vertex AI (set VERTEX_AI_PROJECT, VERTEX_AI_LOCATION)
+  - id: remote::watsonx
+    provider_type: remote::watsonx
+    description: Watsonx (set WATSONX_API_KEY, WATSONX_PROJECT_ID)
+  - id: inline::sentence-transformers
+    provider_type: inline::sentence-transformers
+    description: Sentence transformers (set ENABLE_SENTENCE_TRANSFORMERS)
+
+vector_io:
+  - id: remote::pgvector
+    provider_type: remote::pgvector
+    description: pgvector (default, set ENABLE_PGVECTOR, PGVECTOR_*)
+  - id: inline::faiss
+    provider_type: inline::faiss
+    description: FAISS (set ENABLE_FAISS)
+  - id: remote::qdrant
+    provider_type: remote::qdrant
+    description: Qdrant (set ENABLE_QDRANT, QDRANT_*)

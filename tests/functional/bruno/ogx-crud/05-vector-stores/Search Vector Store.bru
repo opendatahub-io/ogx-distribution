@@ -1,0 +1,29 @@
+meta {
+  name: Search Vector Store
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/v1/vector_stores/{{vector_store_id}}/search
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "query": "Bruno CRUD test",
+    "max_num_results": 3
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has search results", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("data");
+    expect(body.data).to.be.an("array");
+  });
+}

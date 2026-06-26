@@ -1,0 +1,28 @@
+meta {
+  name: Upload File for Vector Store
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/files
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  file: @file(test-upload.txt)
+  purpose: assistants
+}
+
+tests {
+  test("Status is 200 or 201", function() {
+    expect([200, 201]).to.include(res.getStatus());
+  });
+  test("File uploaded for vector store", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("id");
+    expect(body.id).to.be.a("string");
+    bru.setEnvVar("vs_file_id", body.id);
+  });
+}
