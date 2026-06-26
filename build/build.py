@@ -64,6 +64,40 @@ def _validate_version(version: str) -> str:
     return version
 
 
+def _normalize_pkg_name(name: str) -> str:
+    """Normalize a package name per PEP 503 (lowercase, collapse [-_.] to -)."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _parse_constraints(path: Path) -> dict[str, str]:
+    """Parse a pip constraints file and return {normalized_name: full_line}."""
+    constraints: dict[str, str] = {}
+    if not path.exists():
+        return constraints
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = re.match(r"^([a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?)", line)
+        if match:
+            constraints[_normalize_pkg_name(match.group(1))] = line
+    return constraints
+
+
+def _apply_constraints(packages: list[str], constraints: dict[str, str]) -> list[str]:
+    """Replace package specifiers with constrained versions where applicable."""
+    result = []
+    for pkg in packages:
+        match = re.match(r"^([a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?)", pkg)
+        if match:
+            name = _normalize_pkg_name(match.group(1))
+            if name in constraints:
+                result.append(constraints[name])
+                continue
+        result.append(pkg)
+    return result
+
+
 def _load_env(path: Path) -> dict[str, str]:
     """Load key=value pairs from an env file."""
     env = {}
@@ -268,6 +302,7 @@ def get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
             pkg in line
             for pkg in (
                 "opentelemetry-instrumentation-botocore",
+                "opentelemetry-instrumentation-exceptions",
                 "opentelemetry-instrumentation-system-metrics",
             )
         ):
@@ -280,6 +315,9 @@ def generate_requirements_file(dependencies, ogx_reqs: OgxRequirements, otel_pac
     output_path = Path("distribution/requirements.txt")
 
     all_packages = sorted(set(PINNED_DEPENDENCIES + dependencies + otel_packages))
+    all_packages = _apply_constraints(
+        all_packages, _parse_constraints(CONSTRAINTS_FILE)
+    )
 
     lines = [
         "# WARNING: This file is auto-generated. Do not modify it manually.",
