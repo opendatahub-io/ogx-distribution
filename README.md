@@ -116,7 +116,7 @@ To override models: pass comma-separated model IDs via the `models` input when d
 | Provider | Secrets |
 |----------|---------|
 | OpenAI | `OPENAI_API_KEY` |
-| Vertex AI | `VERTEX_AI_PROJECT`, `GCP_WORKLOAD_IDENTITY_PROVIDER` |
+| Vertex AI | `VERTEX_AI_PROJECT`, `VERTEX_AI_LOCATION` (default: `global`), `GCP_WORKLOAD_IDENTITY_PROVIDER` |
 | vLLM MaaS | `MAAS_VLLM_URL`, `MAAS_VLLM_API_TOKEN`, `MAAS_EMBEDDING_URL`, `MAAS_EMBEDDING_API_TOKEN` |
 
 ## ARM64 Support

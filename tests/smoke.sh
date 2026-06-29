@@ -24,6 +24,12 @@ function start_and_wait_for_ogx_container {
     --env "POSTGRES_DB=${POSTGRES_DB:-ogx}"
     --env "POSTGRES_USER=${POSTGRES_USER:-ogx}"
     --env "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ogx}"
+    --env "ENABLE_PGVECTOR=1"
+    --env "PGVECTOR_HOST=${POSTGRES_HOST:-localhost}"
+    --env "PGVECTOR_PORT=${POSTGRES_PORT:-5432}"
+    --env "PGVECTOR_DB=${POSTGRES_DB:-ogx}"
+    --env "PGVECTOR_USER=${POSTGRES_USER:-ogx}"
+    --env "PGVECTOR_PASSWORD=${POSTGRES_PASSWORD:-ogx}"
   )
 
   # Conditionally add vLLM API token (needed for MaaS)
@@ -250,6 +256,77 @@ function test_file_processor_pypdf {
   return 0
 }
 
+function test_rag_file_ingestion {
+  echo "===> Verifying RAG file ingestion pipeline (upload → vector store → index)..."
+
+  local pdf_path="$SCRIPT_DIR/fixtures/sample.pdf"
+  if [ ! -f "$pdf_path" ]; then
+    echo "===> Sample PDF not found at $pdf_path :("
+    return 1
+  fi
+
+  upload_resp=$(curl -fsS "$OGX_BASE_URL/v1/files" \
+    -F "file=@$pdf_path;type=application/pdf" \
+    -F "purpose=assistants")
+  echo "Upload response: $upload_resp"
+
+  file_id=$(echo "$upload_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+  if [ -z "$file_id" ]; then
+    echo "===> Failed to upload file :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+  echo "===> Uploaded file: $file_id"
+
+  vs_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"smoke-test-rag\",\"embedding_model\":\"$EMBEDDING_MODEL\"}")
+  echo "Vector store response: $vs_resp"
+
+  vs_id=$(echo "$vs_resp" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+  if [ -z "$vs_id" ]; then
+    echo "===> Failed to create vector store :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+  echo "===> Created vector store: $vs_id"
+
+  attach_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores/$vs_id/files" \
+    -H "Content-Type: application/json" \
+    -d "{\"file_id\":\"$file_id\"}")
+  echo "Attach response: $attach_resp"
+
+  attached_file_id=$(echo "$attach_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+  if [ -z "$attached_file_id" ]; then
+    echo "===> Failed to attach file to vector store :("
+    docker logs ogx 2>/dev/null | tail -50 || true
+    return 1
+  fi
+
+  echo "===> Polling file ingestion status..."
+  for i in {1..30}; do
+    status_resp=$(curl -fsS "$OGX_BASE_URL/v1/vector_stores/$vs_id/files/$attached_file_id" 2>/dev/null || echo '{}')
+    file_status=$(echo "$status_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null)
+
+    if [ "$file_status" = "completed" ]; then
+      echo "===> File ingestion completed successfully :)"
+      return 0
+    elif [ "$file_status" = "failed" ]; then
+      echo "===> File ingestion failed :("
+      echo "Status response: $status_resp"
+      docker logs ogx 2>/dev/null | tail -50 || true
+      return 1
+    fi
+
+    echo "  Attempt $i: status=$file_status, waiting..."
+    sleep 1
+  done
+
+  echo "===> File ingestion timed out after 30s :("
+  docker logs ogx 2>/dev/null | tail -50 || true
+  return 1
+}
+
 function wait_for_ogx_health {
   echo "Waiting for OGX server..."
   for i in {1..60}; do
@@ -370,6 +447,10 @@ main() {
 
   if ! test_file_processor_pypdf; then
     failed_checks+=("file_processor:pypdf")
+  fi
+
+  if ! test_rag_file_ingestion; then
+    failed_checks+=("rag:file_ingestion")
   fi
 
   # Report results
