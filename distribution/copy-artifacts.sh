@@ -27,7 +27,7 @@ copy_tiktoken() {
 
 copy_granite_embedding() {
     # Recreate the HuggingFace hub cache layout so SentenceTransformer resolves it.
-    local hf_cache="${HOME}/.cache/huggingface/hub"
+    local hf_cache="${APP_ROOT}/.cache/huggingface/hub"
     local model_dir="${hf_cache}/models--ibm-granite--granite-embedding-125m-english"
     local snapshot_dir="${model_dir}/snapshots/prefetched"
     mkdir -p "${snapshot_dir}/1_Pooling" "${model_dir}/refs"
