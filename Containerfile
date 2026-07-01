@@ -6,7 +6,12 @@ ENV UV_INDEX_STRATEGY=unsafe-best-match
 
 COPY distribution/constraints.txt ${APP_ROOT}/constraints.txt
 COPY distribution/requirements.txt ${APP_ROOT}/requirements.txt
-RUN uv pip install --constraint ${APP_ROOT}/constraints.txt -r ${APP_ROOT}/requirements.txt
+
+# Package docling transitively pulls in opencv-python via rapidocr.
+# opencv-python requires libGL.so.1 (absent in UBI). Swap it for the headless variant after install
+RUN uv pip install --constraint ${APP_ROOT}/constraints.txt -r ${APP_ROOT}/requirements.txt \
+    && uv pip uninstall opencv-python \
+    && uv pip install opencv-python-headless
 
 COPY distribution/fetch_artifacts.py ${APP_ROOT}/fetch_artifacts.py
 COPY --chmod=755 distribution/copy-artifacts.sh ${APP_ROOT}/copy-artifacts.sh

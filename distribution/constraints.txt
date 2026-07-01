@@ -21,8 +21,3 @@ opentelemetry-instrumentation-tortoiseorm==0.63b1
 opentelemetry-instrumentation-urllib==0.63b1
 opentelemetry-instrumentation-urllib3==0.63b1
 opentelemetry-instrumentation-wsgi==0.63b1
-
-# Docling transitively pulls opencv-python via rapidocr, which requires
-# libGL.so.1 (absent in UBI base images). Ban it and force the headless variant.
-opencv-python<0
-opencv-python-headless
