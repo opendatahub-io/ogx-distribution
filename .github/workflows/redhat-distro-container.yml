@@ -256,6 +256,8 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         id: smoke-test
         shell: bash
+        env:
+          IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
         run: ./tests/smoke.sh
 
       - name: Integration tests
