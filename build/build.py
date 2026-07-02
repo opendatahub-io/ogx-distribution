@@ -70,7 +70,7 @@ def _resolve_ref_to_sha(repo_url: str, ref: str) -> str:
     For annotated tags, returns the dereferenced commit SHA.
     """
     result = subprocess.run(
-        ["git", "ls-remote", "--tags", repo_url, ref],
+        ["git", "ls-remote", "--tags", "--heads", repo_url, ref],
         capture_output=True,
         text=True,
         check=True,
