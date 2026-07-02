@@ -108,6 +108,9 @@ jobs:
           echo -e "\n=== Pod Logs (last 150 lines) ==="
           oc logs -n redhat-ods-applications --tail=150 -l app=ogx || echo "No logs available"
 
+          echo -e "\n=== OGX Operator Logs (last 50 lines) ==="
+          oc logs -n redhat-ods-applications --tail=50 -l app.kubernetes.io/part-of=ogx || echo "No OGX operator logs available"
+
       - name: Run unprovision.sh
         if: always()
         run: |
