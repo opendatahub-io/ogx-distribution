@@ -1,5 +1,6 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
+#test
 metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/opendatahub-io/ogx-distribution?rev={{revision}}
@@ -34,8 +35,6 @@ spec:
     - 'odh-pr-{{revision}}'
   - name: pipeline-type
     value: pull-request
-  - name: enable-early-gate-testing
-    value: "false"
   pipelineRef:
     resolver: git
     params:
