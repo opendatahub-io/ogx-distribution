@@ -285,6 +285,7 @@ server:
         uri: ${env.AUTH_JWKS_URI:=}
         key_recheck_period: ${env.AUTH_JWKS_RECHECK_PERIOD:=3600}
       verify_tls: ${env.AUTH_VERIFY_TLS:=true}
+      tls_cafile: ${env.AUTH_TLS_CAFILE:=}
     access_policy:
       - permit:
           actions: [read]
