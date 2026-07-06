@@ -21,6 +21,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple
 
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from ruamel.yaml import YAML
 
 # Allowed characters for version strings: alphanumeric, dots, hyphens, plus, underscores
@@ -28,7 +30,6 @@ from ruamel.yaml import YAML
 _VERSION_PATTERN = re.compile(r"^[0-9a-zA-Z._+\-/]+$")
 
 OGX_GIT_REPO = "https://github.com/opendatahub-io/ogx.git"
-
 
 STRIPPED_PROVIDER_TYPES = {
     "inline::sentence-transformers",
@@ -48,18 +49,25 @@ STRIPPED_CONFIG_HEADER = (
 )
 
 
-def _validate_version(version: str) -> str:
-    """Validate a version string contains only safe characters.
+class BuildConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).parent / "build.env",
+    )
 
-    Raises ValueError if the version contains shell metacharacters or
-    other unexpected characters that could lead to injection.
-    """
-    if not version or not _VERSION_PATTERN.match(version):
-        raise ValueError(
-            f"Invalid version format: {version!r}. "
-            "Only alphanumeric characters, dots, hyphens, plus signs, underscores, and slashes are allowed."
-        )
-    return version
+    ogx_version: str
+    ogx_install_from_source: bool = False
+    rhai_index_url: str | None = None
+
+    @field_validator("ogx_version")
+    @classmethod
+    def check_version(cls, v: str) -> str:
+        if not v or not _VERSION_PATTERN.match(v):
+            raise ValueError(
+                f"Invalid version format: {v!r}. "
+                "Only alphanumeric characters, dots, hyphens, plus signs, "
+                "underscores, and slashes are allowed."
+            )
+        return v
 
 
 def _resolve_ref_to_sha(repo_url: str, ref: str) -> str:
@@ -88,18 +96,6 @@ def _resolve_ref_to_sha(repo_url: str, ref: str) -> str:
     return sha
 
 
-def _load_env(path: Path) -> dict[str, str]:
-    """Load key=value pairs from an env file."""
-    env = {}
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, value = line.split("=", 1)
-                env[key.strip()] = value.strip()
-    return env
-
-
 class OgxRequirements(NamedTuple):
     ogx_api: str
     ogx: str
@@ -120,18 +116,13 @@ class LockfileConfig(NamedTuple):
     index_config: IndexConfig
 
 
-def _get_ogx_requirements() -> OgxRequirements:
-    """Resolve ogx package specifiers from build.env and environment.
+def _get_ogx_requirements(version: str, install_from_source: bool) -> OgxRequirements:
+    """Resolve ogx package specifiers.
 
     When installing from source, the git tag is resolved to an immutable
     commit SHA via git ls-remote.
     """
-    env = _load_env(Path(__file__).parent / "build.env")
-
-    version = os.getenv("OGX_VERSION") or env["OGX_VERSION"]
-    _validate_version(version)
-
-    if env.get("OGX_INSTALL_FROM_SOURCE", "").lower() == "true":
+    if install_from_source:
         sha = _resolve_ref_to_sha(OGX_GIT_REPO, version)
         return OgxRequirements(
             ogx_api=f"ogx-api @ git+{OGX_GIT_REPO}@{sha}#subdirectory=src/ogx_api",
@@ -379,7 +370,7 @@ def _write_temp_requirements(lines: list[str]) -> Path:
 
 
 def _get_lockfile_targets(
-    install_from_source: bool, rhai_index_url: str
+    install_from_source: bool, rhai_index_url: str | None
 ) -> dict[LockfileType, LockfileConfig]:
     """Determine which lock files to generate based on build configuration."""
     targets = {}
@@ -462,18 +453,18 @@ def generate_containerfile(version: str):
 
 
 def main():
-    env = _load_env(Path(__file__).parent / "build.env")
-    install_from_source = env.get("OGX_INSTALL_FROM_SOURCE", "").lower() == "true"
-    rhai_index_url = os.getenv("RHAI_INDEX_URL") or env.get("RHAI_INDEX_URL", "")
+    config = BuildConfig()
 
-    ogx_reqs = _get_ogx_requirements()
+    ogx_reqs = _get_ogx_requirements(config.ogx_version, config.ogx_install_from_source)
 
     assert_command_installed("uv")
 
     print("Generating stripped config.yaml...")
     generate_stripped_config()
 
-    targets = _get_lockfile_targets(install_from_source, rhai_index_url)
+    targets = _get_lockfile_targets(
+        config.ogx_install_from_source, config.rhai_index_url
+    )
 
     for name, target in targets.items():
         print(f"Generating {target.output_path}...")
@@ -507,10 +498,8 @@ def main():
         finally:
             os.unlink(tmp_path)
 
-    version = _validate_version(os.getenv("OGX_VERSION") or env["OGX_VERSION"])
-
     print("Generating Containerfile...")
-    generate_containerfile(version)
+    generate_containerfile(config.ogx_version)
 
     print("Done!")
 

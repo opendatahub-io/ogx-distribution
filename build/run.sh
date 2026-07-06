@@ -19,4 +19,4 @@ exec "$runtime" run --rm \
     -v "$REPO_ROOT:/workspace:z" \
     -w /workspace \
     "$IMAGE" \
-    uv run --with ruamel.yaml build/build.py
+    uv run --with ruamel.yaml --with pydantic-settings build/build.py
