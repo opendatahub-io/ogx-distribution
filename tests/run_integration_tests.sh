@@ -84,6 +84,11 @@ function run_integration_tests() {
     # on chunk.id access. Only affects client_with_models; openai_client passes.
     SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls or test_openai_chat_completion_streaming or test_openai_chat_completion_streaming_with_n or test_inference_store_tool_calls"
 
+    # Bedrock doesn't support n>1 or reasoning tokens
+    if [[ "$model" == bedrock/* ]]; then
+        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_streaming_with_n or test_openai_chat_completion_reasoning_passthrough"
+    fi
+
     # Dynamically determine the path to config.yaml from the original script directory
     STACK_CONFIG_PATH="$SCRIPT_DIR/../distribution/config.yaml"
     if [ ! -f "$STACK_CONFIG_PATH" ]; then
@@ -113,11 +118,14 @@ function main() {
     echo "  OPENAI_INFERENCE_MODEL: $OPENAI_INFERENCE_MODEL"
     echo "  GEMINI_INFERENCE_MODEL: ${GEMINI_INFERENCE_MODEL:-<not set>}"
     echo "  ANTHROPIC_INFERENCE_MODEL: ${ANTHROPIC_INFERENCE_MODEL:-<not set>}"
+    echo "  BEDROCK_INFERENCE_MODEL: ${BEDROCK_INFERENCE_MODEL:-<not set>}"
     echo "  EMBEDDING_MODEL: $EMBEDDING_MODEL"
     echo "  VERTEX_AI_PROJECT: ${VERTEX_AI_PROJECT:-<not set>}"
     echo "  OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
     echo "  GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}"
     echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+<set>}"
+    echo "  AWS_BEDROCK_ROLE_ARN: ${AWS_BEDROCK_ROLE_ARN:+<set>}"
+    echo "  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:+<set>}"
 
     clone_ogx
 
@@ -155,6 +163,13 @@ function main() {
         models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
     else
         echo "ANTHROPIC_API_KEY is not set, skipping Anthropic models"
+    fi
+
+    if [ -n "${AWS_BEDROCK_ROLE_ARN:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+        echo "Bedrock credentials available, including Bedrock models in tests"
+        models_to_test+=("$BEDROCK_INFERENCE_MODEL")
+    else
+        echo "Bedrock credentials not available, skipping Bedrock models"
     fi
 
     for model in "${models_to_test[@]}"; do
