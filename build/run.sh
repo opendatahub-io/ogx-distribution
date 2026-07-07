@@ -20,7 +20,7 @@ fi
 
 # Forward any build.env variables that are set as env vars in the host environment.
 env_flags=()
-while IFS='=' read -r key _; do
+while IFS='=' read -r key _ || [[ -n "$key" ]]; do
     if [[ -n "$key" && ! "$key" =~ ^# && -n "${!key:-}" ]]; then
         env_flags+=(-e "$key")
     fi
