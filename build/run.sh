@@ -16,6 +16,7 @@ else
 fi
 
 exec "$runtime" run --rm \
+    --user "$(id -u):$(id -g)" \
     -v "$REPO_ROOT:/workspace:z" \
     -w /workspace \
     "$IMAGE" \
