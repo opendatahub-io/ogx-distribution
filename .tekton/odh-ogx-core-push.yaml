@@ -29,6 +29,8 @@ spec:
     value: Containerfile
   - name: path-context
     value: .
+  - name: enable-early-gate-testing
+    value: "false"
   pipelineRef:
     resolver: git
     params:

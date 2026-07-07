@@ -23,3 +23,8 @@ venv/
 pytest-report.xml
 .coverage
 .python-version
+node_modules/
+tests/functional/reports/
+tests/functional/uv.lock
+tests/functional/bruno/package-lock.json
+tests/functional/bruno/pnpm-lock.yaml

@@ -4,11 +4,24 @@ ENV UV_INDEX_STRATEGY=unsafe-best-match
 
 COPY distribution/constraints.txt ${APP_ROOT}/constraints.txt
 COPY distribution/requirements.txt ${APP_ROOT}/requirements.txt
-RUN uv pip install --constraint ${APP_ROOT}/constraints.txt -r ${APP_ROOT}/requirements.txt
 
-COPY --chmod=755 distribution/install-common.sh ${APP_ROOT}/install-common.sh
+# Package docling transitively pulls in opencv-python via rapidocr.
+# opencv-python requires libGL.so.1 (absent in UBI). Swap it for the headless
+# variant after install, pinned to the exact version the resolver chose.
+RUN uv pip install --constraint ${APP_ROOT}/constraints.txt -r ${APP_ROOT}/requirements.txt \
+    && OPENCV_VERSION=$(uv pip show opencv-python 2>/dev/null | awk '/^Version:/{print $2}') \
+    && [ -n "${OPENCV_VERSION}" ] || { echo "ERROR: opencv-python not found after install"; exit 1; } \
+    && uv pip uninstall opencv-python \
+    && uv pip install --constraint ${APP_ROOT}/constraints.txt "opencv-python-headless==${OPENCV_VERSION}"
+
+COPY distribution/fetch_artifacts.py ${APP_ROOT}/fetch_artifacts.py
+COPY --chmod=755 distribution/copy-artifacts.sh ${APP_ROOT}/copy-artifacts.sh
+COPY distribution/artifacts.lock.yaml ${APP_ROOT}/artifacts.lock.yaml
+RUN --mount=type=cache,target=/var/cache/artifacts,uid=1001,gid=0 \
+    uv run ${APP_ROOT}/fetch_artifacts.py ${APP_ROOT}/artifacts.lock.yaml /var/cache/artifacts \
+    && ${APP_ROOT}/copy-artifacts.sh /var/cache/artifacts
 ENV DOCLING_ARTIFACTS_PATH="${APP_ROOT}/.cache/docling/models"
-RUN ${APP_ROOT}/install-common.sh
+ENV HF_HOME="${APP_ROOT}/.cache/huggingface"
 ENV TIKTOKEN_CACHE_DIR="${APP_ROOT}/.cache/tiktoken"
 
 {config_labels}
