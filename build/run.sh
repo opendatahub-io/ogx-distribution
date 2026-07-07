@@ -6,20 +6,20 @@ set -euo pipefail
 IMAGE="quay.io/opendatahub/odh-midstream-python-base-3-12:latest"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# Run as host user so the container can write to the mounted volume.
 if command -v podman &>/dev/null; then
     runtime=podman
+    user_flag="--userns=keep-id"
 elif command -v docker &>/dev/null; then
     runtime=docker
+    user_flag="--user=$(id -u):$(id -g)"
 else
     echo "Error: podman or docker required" >&2
     exit 1
 fi
 
-# In DinD the container uid may differ from the host file owner,
-# so make build outputs writable by any user.
-chmod -R a+w "$REPO_ROOT/distribution" "$REPO_ROOT/Containerfile" 2>/dev/null || true
-
 exec "$runtime" run --rm \
+    "$user_flag" \
     -v "$REPO_ROOT:/workspace:z" \
     -w /workspace \
     "$IMAGE" \
