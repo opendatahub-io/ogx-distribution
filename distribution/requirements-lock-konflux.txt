@@ -131,8 +131,9 @@ distro==1.9.0 \
 dnspython==2.8.0 \
     --hash=sha256:eebc57dce77a8daa02b3b4b9d3bc6866d233a8371468afd223008593fa66fd06
     # via pymongo
-docling==2.88.0 \
-    --hash=sha256:6ec679f635b9b888a2ccabdebd5ba86cc643ea65e00edf0f0a63664344004787
+docling==2.94.0 \
+    --hash=sha256:13b87660a5f7d96a85e863da631bbf83e6496bd74ef5e950ca780dacdbe82b48 \
+    --hash=sha256:e5f0c79091d4654f9b9a8b28dc064e421253295b3dbefd3424831c7ccc00a23a
     # via -r /tmp/requirements.txt
 docling-core==2.84.0 \
     --hash=sha256:42958a59062a0cb30e17c676e4b72786f5badd4cb14ad52ee41c33875d896ae7
