@@ -1,23 +1,7 @@
-# Pin otel instrumentation to versions available in the RHAI package index.
-# Remove these pins when the index has the versions from opentelemetry-bootstrap.
-opentelemetry-instrumentation-asyncio==0.63b1
-opentelemetry-instrumentation-asyncpg==0.63b1
-opentelemetry-instrumentation-boto3sqs==0.63b1
-opentelemetry-instrumentation-click==0.63b1
-opentelemetry-instrumentation-dbapi==0.63b1
-opentelemetry-instrumentation-fastapi==0.63b1
-opentelemetry-instrumentation-grpc==0.63b1
-opentelemetry-instrumentation-httpx==0.63b1
-opentelemetry-instrumentation-jinja2==0.63b1
-opentelemetry-instrumentation-logging==0.63b1
-opentelemetry-instrumentation-pymongo==0.63b1
-opentelemetry-instrumentation-redis==0.63b1
-opentelemetry-instrumentation-requests==0.63b1
-opentelemetry-instrumentation-sqlalchemy==0.63b1
-opentelemetry-instrumentation-sqlite3==0.63b1
-opentelemetry-instrumentation-starlette==0.63b1
-opentelemetry-instrumentation-threading==0.63b1
-opentelemetry-instrumentation-tortoiseorm==0.63b1
-opentelemetry-instrumentation-urllib==0.63b1
-opentelemetry-instrumentation-urllib3==0.63b1
-opentelemetry-instrumentation-wsgi==0.63b1
+# Pip constraints for dependency version overrides.
+# Use this file only for constraints that must apply across both midstream and downstream.
+
+# <3.0 requires pkg_resources, dropped in setuptools 81+
+milvus-lite>=3.0.0
+# 2.6.10 crashes Milvus Lite gRPC init with empty dns:/// target
+pymilvus!=2.6.10
