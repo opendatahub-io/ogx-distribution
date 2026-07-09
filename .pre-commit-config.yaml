@@ -46,14 +46,11 @@ repos:
     hooks:
       - id: pkg-gen
         name: Distribution Build
-        entry: ./build/build.py
-        language: python
+        entry: ./build/run.sh
+        language: script
         pass_filenames: false
         require_serial: true
         always_run: true
-        additional_dependencies:
-          - uv>=0.9.0
-          - ruamel.yaml>=0.18.0
 
       - id: doc-gen
         name: Distribution Documentation

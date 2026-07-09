@@ -127,7 +127,8 @@ jobs:
         id: commit
         run: |
           git add build/build.env Containerfile \
-            distribution/requirements.txt distribution/README.md
+            distribution/requirements-lock.txt distribution/requirements-lock-konflux.txt \
+            distribution/README.md
           if git diff --cached --quiet; then
             echo "::notice::No changes to commit — version may already be set to ${TAG}"
           else

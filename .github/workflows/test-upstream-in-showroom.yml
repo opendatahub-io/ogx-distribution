@@ -45,10 +45,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building image with OGX_VERSION=main: ogx-test:$TAG"
 
-          uv venv
-          source .venv/bin/activate
-          uv pip install 'ruamel.yaml>=0.18.0'
-          python3 build/build.py
+          ./build/run.sh
           podman build -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Setup CI environment
