@@ -9,10 +9,10 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Run as host user so the container can write to the mounted volume.
 if command -v podman &>/dev/null; then
     runtime=podman
-    user_flag="--userns=keep-id"
+    user_flags=(--userns=keep-id --user="$(id -u):$(id -g)")
 elif command -v docker &>/dev/null; then
     runtime=docker
-    user_flag="--user=$(id -u):$(id -g)"
+    user_flags=(--user="$(id -u):$(id -g)")
 else
     echo "Error: podman or docker required" >&2
     exit 1
@@ -27,7 +27,7 @@ while IFS='=' read -r key _ || [[ -n "$key" ]]; do
 done < "$REPO_ROOT/build/build.env"
 
 exec "$runtime" run --rm \
-    "$user_flag" \
+    "${user_flags[@]}" \
     "${env_flags[@]}" \
     -v "$REPO_ROOT:/workspace:z" \
     -w /workspace \
