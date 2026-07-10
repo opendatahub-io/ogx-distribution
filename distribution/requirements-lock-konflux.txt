@@ -160,7 +160,9 @@ docling-parse==7.5.0 \
     # via docling-slim
 docling-slim==2.110.0 \
     --hash=sha256:5a4c784837f457af5e4856d4aa33ae3c8eb48fcc2faf484157d379e5642d4797
-    # via docling
+    # via
+    #   -r /tmp/requirements.txt
+    #   docling
 docstring-parser==0.18.0 \
     --hash=sha256:99af886f2018766522dbfcfbd80dde97b776b4b407d7d298d5d17dcd502a4f7a
     # via anthropic
@@ -214,8 +216,8 @@ fsspec==2026.6.0 \
 google-auth==2.55.1 \
     --hash=sha256:ac65513eeeb2813444f44744b513a087303eeaa34e9296f0fb151503196635c5
     # via google-genai
-google-genai==2.10.0 \
-    --hash=sha256:ab73acfb23dc24a89db2cf84fcef0e87926bd3b447d9941d0330c71eb9e2881d
+google-genai==1.75.0 \
+    --hash=sha256:9d4f934c06ee59e2e348c727f54cac9c066c4725184f6a345a526e80f654c2cb
     # via -r /tmp/requirements.txt
 googleapis-common-protos==1.75.0 \
     --hash=sha256:371cd0ca347d6b331c0f70fbbf7aa5cbbba6092d91d27c9bbfab7701a1b6612d
@@ -444,9 +446,9 @@ numpy==2.5.1 \
     #   shapely
     #   torchvision
     #   transformers
-ogx @ git+https://github.com/opendatahub-io/ogx.git@032e7ca919e5fddca281dad34141ecd011de4b05
+ogx @ git+https://github.com/opendatahub-io/ogx.git@7b9e308624e24b56468426f08ac1183d6f811283
     # via -r /tmp/requirements.txt
-ogx-api @ git+https://github.com/opendatahub-io/ogx.git@032e7ca919e5fddca281dad34141ecd011de4b05#subdirectory=src/ogx_api
+ogx-api @ git+https://github.com/opendatahub-io/ogx.git@7b9e308624e24b56468426f08ac1183d6f811283#subdirectory=src/ogx_api
     # via
     #   -r /tmp/requirements.txt
     #   ogx
@@ -479,6 +481,7 @@ opentelemetry-api==1.43.0 \
     #   opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-exporter-prometheus
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-asyncio
@@ -526,6 +529,9 @@ opentelemetry-exporter-otlp-proto-http==1.43.0 \
     #   -r /tmp/requirements.txt
     #   ogx
     #   ogx-api
+opentelemetry-exporter-prometheus==0.64b0 \
+    --hash=sha256:078ce12d69f4b010ed262f71f6f1ca2434bc3aa0a367dbdfc4c3661388e0714f
+    # via ogx
 opentelemetry-instrumentation==0.64b0 \
     --hash=sha256:63e378e600f45e0a85daea1894d79e7b92633c4a6645c3fbf3deda9d7c11dcd3
     # via
@@ -642,6 +648,7 @@ opentelemetry-sdk==1.43.0 \
     #   opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-exporter-prometheus
 opentelemetry-semantic-conventions==0.64b0 \
     --hash=sha256:00d10ccc86c1c169ab96e8b182b5369ad20c129d473a1e40f93ce3226786ffe0
     # via
@@ -735,6 +742,9 @@ polyfactory==3.3.0 \
 portalocker==3.2.0 \
     --hash=sha256:45d3f49b3fa2769b5ef4f437a6972c1b4f9540c4cfab1ced1344396ef2e5f78d
     # via qdrant-client
+prometheus-client==0.25.0 \
+    --hash=sha256:34577aeee817238adf900bebb60c63697fa70d15d8f9e1c6984729cce45fb10f
+    # via opentelemetry-exporter-prometheus
 protobuf==7.35.1 \
     --hash=sha256:181e87b451839ee061ccc0c6b9cea83c88273050eb1ca5cb87251579e107dc5e \
     --hash=sha256:233da0f55155b17cc05d238787d6c6f8939e60d93e9c79d43a7689221f84eb81 \
