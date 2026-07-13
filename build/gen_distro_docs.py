@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import yaml
 import re
+
+import yaml
 from pathlib import Path
 
 
@@ -182,6 +183,57 @@ def gen_distro_table(providers_data, runtime_provider_types=None):
     return "\n".join(table_lines)
 
 
+def extract_file_secret_vars():
+    """Extract the secret env var names from entrypoint.sh's _FILE resolution loop."""
+    entrypoint = REPO_ROOT / "distribution" / "entrypoint.sh"
+    text = entrypoint.read_text()
+    match = re.search(r"for _secret_var in\s*\\(.*?);\s*do", text, re.DOTALL)
+    if not match:
+        return []
+    body = match.group(1).replace("\\", " ")
+    return sorted(v for v in body.split() if v)
+
+
+def gen_file_secrets_section(secret_vars):
+    """Generate a markdown section documenting _FILE secret support."""
+    if not secret_vars:
+        return ""
+
+    var_list = "\n".join(f"- `{var}` → `{var}_FILE`" for var in secret_vars)
+
+    return f"""
+## Mounting Secrets as Files
+
+Instead of passing secrets directly as environment variables (which exposes them in
+`/proc/1/environ` and subprocess environments), you can mount them as files and
+point to them with `_FILE`-suffixed variables. At container startup, the entrypoint
+reads each file and populates the corresponding environment variable.
+
+For example, to inject `OPENAI_API_KEY` from a mounted Kubernetes Secret:
+
+```yaml
+env:
+  - name: OPENAI_API_KEY_FILE
+    value: /run/secrets/openai-api-key
+volumeMounts:
+  - name: openai-secret
+    mountPath: /run/secrets/openai-api-key
+    subPath: api-key
+    readOnly: true
+volumes:
+  - name: openai-secret
+    secret:
+      secretName: openai-credentials
+```
+
+Setting both the base variable and its `_FILE` variant is an error (mutually exclusive).
+
+### Supported variables
+
+{var_list}
+"""
+
+
 def gen_distro_docs():
     build_path = REPO_ROOT / "build" / "build.yaml"
     readme_path = REPO_ROOT / "distribution" / "README.md"
@@ -246,8 +298,13 @@ You can see an overview of the APIs and Providers the image ships with in the ta
             "definitions.\n"
         )
 
+        secret_vars = extract_file_secret_vars()
+        file_secrets_section = gen_file_secrets_section(secret_vars)
+
         with open(readme_path, "w") as readme_file:
-            readme_file.write(header + table_content + "\n" + dep_only_note)
+            readme_file.write(
+                header + table_content + "\n" + dep_only_note + file_secrets_section
+            )
 
         print(f"Successfully generated {readme_path}")
         print(
