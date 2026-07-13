@@ -430,10 +430,15 @@ main() {
     # /v1/messages, so native passthrough cannot succeed through it. Native
     # passthrough is covered deterministically against a local vLLM by
     # messages-vllm.yml; OpenAI translation by messages-openai.yml.
+    #
+    # Also temporarily skipped for local vLLM: upstream OGX bug
+    # constructs a double "/v1/v1/messages" URL for the vLLM provider,
+    # causing a 404. Re-enable once fixed upstream.
+    # https://github.com/ogx-ai/ogx/issues/6290
     if [ "${USING_MAAS:-false}" == "true" ]; then
       echo "===> Skipping Messages API smoke (MaaS gateway has no /v1/messages route)"
-    elif ! test_messages_basic "$VLLM_INFERENCE_MODEL"; then
-      failed_checks+=("messages:$VLLM_INFERENCE_MODEL")
+    else
+      echo "===> Skipping Messages API smoke (upstream OGX bug: double /v1 path, see ogx-ai/ogx#6290)"
     fi
 
     # Verify PostgreSQL tables and data
