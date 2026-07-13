@@ -102,6 +102,9 @@ jobs:
             echo "distribution/ and Containerfile were not modified in this push, skipping publish"
           fi
 
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
