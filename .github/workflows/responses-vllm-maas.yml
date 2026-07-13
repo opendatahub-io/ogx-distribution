@@ -146,6 +146,16 @@ jobs:
           reporter: java-junit
           fail-on-error: 'false'
 
+      - name: Scrub secrets from test results
+        if: ${{ !cancelled() }}
+        env:
+          VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
+          VLLM_EMBEDDING_API_TOKEN: ${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+          TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
+        run: |
+          ./tests/scrub_secrets.sh '/tmp/test-results/*' \
+            VLLM_API_TOKEN VLLM_EMBEDDING_API_TOKEN TAVILY_SEARCH_API_KEY
+
       - name: Upload artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

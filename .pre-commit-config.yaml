@@ -61,3 +61,10 @@ repos:
         files: ^(build/(build\.yaml|build\.env)|distribution/config\.yaml)$
         additional_dependencies:
           - pyyaml==6.0.2
+
+      - id: check-secret-scrub
+        name: CI log-scrub list matches smoke.sh secrets
+        entry: ./tests/check_secret_scrub_list.sh
+        language: script
+        pass_filenames: false
+        files: ^(tests/smoke\.sh|\.github/workflows/redhat-distro-container\.yml)$

@@ -302,6 +302,13 @@ jobs:
             done
           fi
 
+          # Scrub secret values from log files before upload (CWE-532)
+          ./tests/scrub_secrets.sh 'logs/*.log' \
+            VLLM_API_TOKEN VLLM_EMBEDDING_API_TOKEN \
+            OPENAI_API_KEY GEMINI_API_KEY ANTHROPIC_API_KEY \
+            POSTGRES_PASSWORD PGVECTOR_PASSWORD \
+            GOOGLE_APPLICATION_CREDENTIALS
+
       - name: Upload logs as artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
