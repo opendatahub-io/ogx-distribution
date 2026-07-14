@@ -56,6 +56,22 @@ for _secret_var in \
 done
 unset _secret_var
 
+# Warn when the server will start without authentication.
+# Auth activates only when AUTH_ISSUER is set (the provider_config.type
+# in config.yaml uses ${env.AUTH_ISSUER:+oauth2_token}).  In RHOAI
+# deployments the operator adds NetworkPolicy + no-route-by-default as
+# defense-in-depth, but standalone / dev users should be aware.
+if [ -z "${AUTH_ISSUER:-}" ]; then
+  printf '\n' >&2
+  printf '=========================================================\n' >&2
+  printf '  WARNING: Server authentication is NOT configured.\n' >&2
+  printf '  All APIs are accessible without credentials.\n' >&2
+  printf '  Set AUTH_ISSUER and AUTH_JWKS_URI to enable OAuth2\n' >&2
+  printf '  token authentication.\n' >&2
+  printf '=========================================================\n' >&2
+  printf '\n' >&2
+fi
+
 # Resolve config path
 if [ -n "$RUN_CONFIG_PATH" ] && [ -f "$RUN_CONFIG_PATH" ]; then
   CONFIG="$RUN_CONFIG_PATH"
