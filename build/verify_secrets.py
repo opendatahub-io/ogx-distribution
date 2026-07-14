@@ -49,7 +49,7 @@ def _extract_secret_env_vars_from_yaml(yaml_path: Path) -> set[str]:
                 for match in env_ref.finditer(node):
                     secrets.add(match.group(1))
 
-    with open(yaml_path) as f:
+    with open(yaml_path, encoding="utf-8") as f:
         data = safe_load(f)
     _walk(data)
     return secrets
@@ -57,7 +57,7 @@ def _extract_secret_env_vars_from_yaml(yaml_path: Path) -> set[str]:
 
 def _extract_entrypoint_secrets(entrypoint_path: Path) -> set[str]:
     """Extract the secret var names from the entrypoint.sh for-loop."""
-    text = entrypoint_path.read_text()
+    text = entrypoint_path.read_text(encoding="utf-8")
     match = re.search(r"for _secret_var in\s*\\(.*?);\s*do", text, re.DOTALL)
     if not match:
         print(f"Error: could not find _secret_var loop in {entrypoint_path}")

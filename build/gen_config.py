@@ -46,7 +46,7 @@ def main():
     ryaml.width = 4096
     ryaml.indent(sequence=4, offset=2)
 
-    with open(build_path, "r") as f:
+    with open(build_path, "r", encoding="utf-8") as f:
         config = ryaml.load(f)
 
     # Validate that every entry in STRIPPED_PROVIDER_TYPES exists in build.yaml
@@ -80,7 +80,7 @@ def main():
         f"#   - {t}\n" for t in sorted(STRIPPED_PROVIDER_TYPES)
     )
 
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(header)
         ryaml.dump(config, f)
 

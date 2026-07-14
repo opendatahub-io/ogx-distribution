@@ -51,7 +51,7 @@ def main():
         print(f"Error: Template file {template_path} not found")
         sys.exit(1)
 
-    template_content = template_path.read_text()
+    template_content = template_path.read_text(encoding="utf-8")
     placeholder_count = template_content.count("{config_labels}")
     if placeholder_count != 1:
         print(
@@ -70,7 +70,7 @@ def main():
         "{config_labels}", _generate_config_labels(version)
     )
 
-    output_path.write_text(containerfile_content)
+    output_path.write_text(containerfile_content, encoding="utf-8")
     print(f"Successfully generated {output_path}")
 
 
