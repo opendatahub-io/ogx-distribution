@@ -44,23 +44,37 @@ repos:
 
 -   repo: local
     hooks:
-      - id: pkg-gen
-        name: Distribution Build
-        entry: ./build/run.sh
-        language: script
+      - id: gen-config
+        name: Generate config.yaml
+        entry: uv run build/gen_config.py
+        language: system
+        pass_filenames: false
+        require_serial: true
+        always_run: true
+
+      - id: gen-containerfile
+        name: Generate Containerfile
+        entry: uv run build/gen_containerfile.py
+        language: system
+        pass_filenames: false
+        require_serial: true
+        always_run: true
+
+      - id: verify-secrets
+        name: Verify _FILE secret sync
+        entry: uv run build/verify_secrets.py
+        language: system
         pass_filenames: false
         require_serial: true
         always_run: true
 
       - id: doc-gen
         name: Distribution Documentation
-        entry: ./build/gen_distro_docs.py
-        language: python
+        entry: uv run build/gen_distro_docs.py
+        language: system
         pass_filenames: false
         require_serial: true
         files: ^(build/(build\.yaml|build\.env)|distribution/config\.yaml)$
-        additional_dependencies:
-          - pyyaml==6.0.2
 
       - id: check-secret-scrub
         name: CI log-scrub list matches smoke.sh secrets

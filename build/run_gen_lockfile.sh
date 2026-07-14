@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs build.py inside a Linux container for consistent builds.
+# Runs gen_lockfile.py inside a Linux container for consistent builds.
 
 set -euo pipefail
 
@@ -32,4 +32,4 @@ exec "$runtime" run --rm \
     -v "$REPO_ROOT:/workspace:z" \
     -w /workspace \
     "$IMAGE" \
-    uv run --with ruamel.yaml --with pydantic-settings --with pyyaml build/build.py
+    uv run build/gen_lockfile.py

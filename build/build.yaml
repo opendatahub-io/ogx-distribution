@@ -151,7 +151,7 @@ providers:
   tool_runtime:
   # NOTE: inline::file-search requires a 'files' provider at runtime
   # (currently inline::localfs). Do not add inline::localfs to
-  # STRIPPED_PROVIDER_TYPES in build.py without also removing
+  # STRIPPED_PROVIDER_TYPES in gen_config.py without also removing
   # inline::file-search here.
   - provider_id: brave-search
     provider_type: remote::brave-search
