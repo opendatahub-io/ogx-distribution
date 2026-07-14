@@ -45,7 +45,10 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building image with OGX_VERSION=main: ogx-test:$TAG"
 
-          ./build/run.sh
+          uv run build/gen_config.py
+          uv run build/gen_lockfile.py
+          uv run build/gen_containerfile.py
+          uv run build/verify_secrets.py
           podman build -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Setup CI environment
