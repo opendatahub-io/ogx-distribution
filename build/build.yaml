@@ -153,12 +153,12 @@ providers:
   # (currently inline::localfs). Do not add inline::localfs to
   # STRIPPED_PROVIDER_TYPES in gen_config.py without also removing
   # inline::file-search here.
-  - provider_id: brave-search
+  - provider_id: ${env.BRAVE_SEARCH_API_KEY:+brave-search}
     provider_type: remote::brave-search
     config:
       api_key: ${env.BRAVE_SEARCH_API_KEY:=}
       max_results: 3
-  - provider_id: tavily-search
+  - provider_id: ${env.TAVILY_SEARCH_API_KEY:+tavily-search}
     provider_type: remote::tavily-search
     config:
       api_key: ${env.TAVILY_SEARCH_API_KEY:=}
@@ -263,7 +263,7 @@ registered_resources:
     model_type: embedding
   vector_dbs: []
   tool_groups:
-  - toolgroup_id: builtin::websearch
+  - toolgroup_id: ${env.TAVILY_SEARCH_API_KEY:+builtin::websearch}
     provider_id: tavily-search
   - toolgroup_id: builtin::rag
     provider_id: file-search
