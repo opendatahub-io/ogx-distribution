@@ -192,7 +192,9 @@ Runs on all pull requests and pushes to `main`. Executes the full pre-commit hoo
 - **Shellcheck** - Shell script linting
 - **Actionlint** - GitHub Actions workflow linting
 - **Standard hooks** - merge conflict detection, trailing whitespace, large file checks, YAML/JSON/TOML validation, executable shebangs, private key detection, mixed line endings
-- **Distribution Build** (`build/build.py`) - Regenerates `distribution/config.yaml` and `distribution/requirements.txt`
+- **Generate config.yaml** (`build/gen_config.py`) - Strips dependency-only providers from `build.yaml`
+- **Generate Containerfile** (`build/gen_containerfile.py`) - Generates `Containerfile` from `Containerfile.in`
+- **Verify _FILE secret sync** (`build/verify_secrets.py`) - Checks secret env vars match `entrypoint.sh`
 - **Distribution Documentation** (`build/gen_distro_docs.py`) - Regenerates `distribution/README.md`
 
 ### Semantic PR Titles (`semantic-pr.yml`)
@@ -204,7 +206,7 @@ Validates that pull request titles follow [Conventional Commits](https://www.con
 Triggered via `repository_dispatch` (type: `update-ogx-version`) from the opendatahub-io/ogx midstream repo when a new release is tagged. The workflow:
 
 1. **Validates** the tag format (`vX.Y.Z[.W]+rhaiv.N`) and runs preflight checks (version not already set, branch doesn't exist)
-2. **Updates** `CURRENT_OGX_VERSION` in `build/build.py`
+2. **Updates** `OGX_VERSION` in `build/build.env`
 3. **Runs pre-commit** to regenerate distribution artifacts (Containerfile, README)
 4. **Opens a pull request** against `main` with the version bump
 5. **Notifies Slack** with the PR link for review

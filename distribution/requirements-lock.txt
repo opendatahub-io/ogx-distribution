@@ -42,9 +42,9 @@ anyio==4.14.2 \
     #   openai
     #   sse-starlette
     #   starlette
-asgiref==3.11.1 \
-    --hash=sha256:5f184dc43b7e763efe848065441eac62229c9f7b0475f41f80e207a114eda4ce \
-    --hash=sha256:e8667a091e69529631969fd45dc268fa79b99c92c5fcdda727757e52146ec133
+asgiref==3.12.0 \
+    --hash=sha256:37ef86a30c3549f1a469c78c4521a63b8c31c17ee42cf792a2b054af81e23c79 \
+    --hash=sha256:3d8d6471b12501782d78b513c1f207d613a4de34b8a67c0baa561f61deda1d22
     # via opentelemetry-instrumentation-asgi
 asyncpg==0.31.0 \
     --hash=sha256:027eaa61361ec735926566f995d959ade4796f6a49d3bde17e5134b9964f9ba8 \
