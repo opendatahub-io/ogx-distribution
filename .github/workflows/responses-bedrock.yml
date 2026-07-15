@@ -205,7 +205,13 @@ jobs:
 
           uv venv --clear
           source .venv/bin/activate
-          uv pip install -e . 'ogx-client==1.0.0' ollama 'pytest>=8.4,<9' langchain-openai langgraph
+          uv pip install -e . \
+            'ogx-client==1.0.0' \
+            'ollama==0.6.0' \
+            'openai==2.30.0' \
+            'pytest==8.4.2' \
+            'langchain-openai==1.1.9' \
+            'langgraph==1.1.6'
 
       - name: Derive short model name
         id: model
