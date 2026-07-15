@@ -23,5 +23,30 @@
         "error": 206
       }
     ]
+  },
+  {
+    "date": "2026-07-15 19:51 UTC",
+    "run_number": "36",
+    "run_id": "29445672877",
+    "run_url": "https://github.com/opendatahub-io/ogx-distribution/actions/runs/29445672877",
+    "ogx_version": "v1.2.1+rhaiv.0",
+    "branch": "feat/112-J-1978-add-live-ci-tests-for-bedrock",
+    "commit": "328f8b71",
+    "totals": {
+      "passed": 45,
+      "failed": 7,
+      "skipped": 21,
+      "error": 206
+    },
+    "models": [
+      {
+        "provider": "bedrock",
+        "model": "openai.gpt-oss-20b-1-0",
+        "passed": 45,
+        "failed": 7,
+        "skipped": 21,
+        "error": 206
+      }
+    ]
   }
 ]
