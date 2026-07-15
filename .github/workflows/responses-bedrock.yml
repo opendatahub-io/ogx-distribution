@@ -40,7 +40,7 @@ env:
   PROVIDER_NAME: bedrock
   EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
   IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
-  IMAGE_REF: quay.io/opendatahub/odh-ogx-core@${{ inputs.image_digest || 'sha256:d367cb4be5da1028f90a962ea24d9804c8ea35d6463488c7741196bd948b3bbc' }}
+  IMAGE_DIGEST: ${{ inputs.image_digest || 'sha256:d367cb4be5da1028f90a962ea24d9804c8ea35d6463488c7741196bd948b3bbc' }}
 
 jobs:
   check:
@@ -136,8 +136,13 @@ jobs:
         env:
           MODEL: ${{ matrix.model }}
         run: |
-          docker pull "$IMAGE_REF"
-          docker create --name ogx-cfg "$IMAGE_REF" true > /dev/null
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::image_digest must be a sha256 digest"
+            exit 1
+          fi
+          image_ref="$IMAGE_NAME@$IMAGE_DIGEST"
+          docker pull "$image_ref"
+          docker create --name ogx-cfg "$image_ref" true > /dev/null
           docker cp ogx-cfg:/opt/app-root/config.yaml /tmp/config-patched.yaml
           docker rm ogx-cfg > /dev/null
           python3 - <<'PY'
@@ -181,7 +186,7 @@ jobs:
         uses: ./.github/actions/setup-server
         with:
           image_name: ${{ env.IMAGE_NAME }}
-          image_ref: ${{ env.IMAGE_REF }}
+          image_digest: ${{ env.IMAGE_DIGEST }}
           volumes: |
             /tmp/config-patched.yaml:/opt/app-root/config-patched.yaml:ro
           extra_env: |
