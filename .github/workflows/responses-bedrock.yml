@@ -13,6 +13,13 @@ on:
         required: false
         type: string
         default: ''
+    secrets:
+      AWS_BEDROCK_ROLE_ARN:
+        description: 'IAM role assumed by GitHub Actions through OIDC'
+        required: false
+      TAVILY_SEARCH_API_KEY:
+        description: 'Tavily API key used by Responses tests'
+        required: false
   workflow_dispatch:
     inputs:
       image_tag:
@@ -38,6 +45,7 @@ env:
 jobs:
   check:
     runs-on: ubuntu-24.04
+    permissions: {}
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
       models_json: ${{ steps.models.outputs.json }}
@@ -92,6 +100,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
@@ -130,19 +140,22 @@ jobs:
           docker create --name ogx-cfg "$IMAGE_NAME:$IMAGE_TAG" true > /dev/null
           docker cp ogx-cfg:/opt/app-root/config.yaml /tmp/config-patched.yaml
           docker rm ogx-cfg > /dev/null
-          provider_model_id="${MODEL#bedrock/}"
-          python3 -c "
+          python3 - <<'PY'
+          import os
+
           import yaml
+
+          model = os.environ["MODEL"]
           cfg = yaml.safe_load(open('/tmp/config-patched.yaml'))
           cfg.setdefault('registered_resources', {}).setdefault('models', []).append({
               'metadata': {},
-              'model_id': '$MODEL',
+              'model_id': model,
               'provider_id': 'bedrock',
-              'provider_model_id': '$provider_model_id',
+              'provider_model_id': model.removeprefix('bedrock/'),
               'model_type': 'llm',
           })
           yaml.dump(cfg, open('/tmp/config-patched.yaml', 'w'), default_flow_style=False)
-          "
+          PY
 
       - name: Setup server
         uses: ./.github/actions/setup-server

@@ -80,7 +80,9 @@ jobs:
     with:
       models: ${{ inputs.bedrock_models }}
       aws_region: ${{ inputs.bedrock_region }}
-    secrets: inherit
+    secrets:
+      AWS_BEDROCK_ROLE_ARN: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+      TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
 
   # ── Test Report & GitHub Pages ───────────────────────────────────
   report:
