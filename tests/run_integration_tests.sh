@@ -17,10 +17,10 @@ if [ -z "$OGX_VERSION" ]; then
     echo "Error: Could not extract OGX_VERSION from build.env"
     exit 1
 fi
-# Extract repo URL from build.py constant
-OGX_REPO=$(grep 'OGX_GIT_REPO' "$SCRIPT_DIR/../build/build.py" | grep -o 'https://[^"]*')
+# Extract repo URL from gen_lockfile.py constant
+OGX_REPO=$(grep 'OGX_GIT_REPO' "$SCRIPT_DIR/../build/gen_lockfile.py" | grep -o 'https://[^"]*')
 if [ -z "$OGX_REPO" ]; then
-    echo "Error: Could not extract OGX_GIT_REPO from build.py"
+    echo "Error: Could not extract OGX_GIT_REPO from gen_lockfile.py"
     exit 1
 fi
 # Strip .git suffix for cloning and leading v for version display

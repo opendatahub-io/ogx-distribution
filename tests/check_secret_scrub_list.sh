@@ -9,7 +9,7 @@ SMOKE="$REPO_ROOT/tests/smoke.sh"
 WORKFLOW="$REPO_ROOT/.github/workflows/redhat-distro-container.yml"
 
 # Extract env var names passed via --env to the docker container in smoke.sh
-smoke_vars=$(grep -oP '(?<=--env ")([A-Z_]+)(?==)' "$SMOKE" | sort -u)
+smoke_vars=$(grep -oE '\-\-env "[A-Z_]+=' "$SMOKE" | sed 's/--env "//;s/=//' | sort -u)
 
 # Filter to secret-looking names
 secret_pattern='KEY|TOKEN|PASSWORD|SECRET|CREDENTIAL'
@@ -22,7 +22,7 @@ fi
 
 # Extract the var names from the workflow's scrub_secrets.sh invocation
 scrub_vars=$(grep -A10 'scrub_secrets\.sh' "$WORKFLOW" \
-  | grep -oP '\b[A-Z][A-Z_]{2,}\b' \
+  | grep -oE '[A-Z][A-Z_]{2,}' \
   | grep -E "$secret_pattern" \
   | sort -u)
 
