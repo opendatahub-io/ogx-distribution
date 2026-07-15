@@ -19,14 +19,15 @@ on:
         type: string
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    concurrency:
-      group: openshift-cluster-1
-      cancel-in-progress: false
+    timeout-minutes: 15
     permissions:
       contents: read
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.build.outputs.tag }}
+      sha: ${{ steps.pr-info.outputs.sha }}
 
     steps:
       - name: Get PR information
@@ -64,26 +65,20 @@ jobs:
         with:
           repository: ${{ steps.pr-info.outputs.repo }}
           ref: ${{ steps.pr-info.outputs.sha }}
-          path: ogx-distribution
           persist-credentials: false
 
       - name: Checkout pushed code
         if: inputs.pr_number == ''
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          path: ogx-distribution
 
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
 
       - name: Regenerate distribution artifacts
-        uses: ./ogx-distribution/.github/actions/regenerate-artifacts
-        with:
-          working-directory: ogx-distribution
+        uses: ./.github/actions/regenerate-artifacts
 
       - name: Build image
         id: build
-        working-directory: ogx-distribution
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
           PR_SHA: ${{ steps.pr-info.outputs.sha }}
@@ -107,12 +102,51 @@ jobs:
           echo "Building image: ogx-test:$TAG"
           podman build -f Containerfile -t "ogx-test:$TAG" .
 
+      - name: Save image as artifact
+        env:
+          TAG: ${{ steps.build.outputs.tag }}
+        run: |
+          podman save "ogx-test:$TAG" | zstd -T0 -o ogx-test-image.tar.zst
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ogx-test-image
+          path: ogx-test-image.tar.zst
+          retention-days: 1
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: openshift-cluster-1
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      REGISTRY_IMAGE: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ needs.build.outputs.tag }}"
+
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ogx-test-image
+
+      - name: Load image
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          zstd -d ogx-test-image.tar.zst --stdout | podman load
+          rm ogx-test-image.tar.zst
+          podman image exists "ogx-test:$TAG"
+
       - name: Setup CI environment
         id: setup
         uses: derekhiggins/llama-stack-showroom@f32973c9b7389b14d1988b55abfe74dd98c2432f  # main as of 2026-06-05
         with:
           catalog_image: ${{ inputs.catalog_image }}
-          llama_stack_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
+          llama_stack_image: ${{ env.REGISTRY_IMAGE }}
           operator_image: ${{ inputs.operator_image }}
           oc_server: ${{ secrets.OC_SERVER }}
           oc_token: ${{ secrets.OC_TOKEN }}
@@ -125,18 +159,13 @@ jobs:
             SHOWROOM_OPENAI_API_KEY=${{ secrets.SHOWROOM_OPENAI_API_KEY }}
 
       - name: Push image to OpenShift registry
-        id: push
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
-          # Push image to registry
           "${{ steps.setup.outputs.scripts_dir }}/push-image-to-registry.sh" \
-            ogx-test:${{ steps.build.outputs.tag }} \
+            "ogx-test:$TAG" \
             redhat-ods-operator \
-            ogx-test:${{ steps.build.outputs.tag }}
-
-          # Construct pull URL for cluster-internal access
-          PULL_IMAGE="image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
-
-          echo "pull_image=${PULL_IMAGE}" >> "$GITHUB_OUTPUT"
+            "ogx-test:$TAG"
 
       - name: Run setup.sh
         run: |
@@ -181,9 +210,9 @@ jobs:
         if: always()
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
-          PR_SHA: ${{ steps.pr-info.outputs.sha }}
+          PR_SHA: ${{ needs.build.outputs.sha }}
           PUSH_SHA: ${{ github.sha }}
-          IMAGE_TAG: ${{ steps.build.outputs.tag }}
+          IMAGE_TAG: ${{ needs.build.outputs.tag }}
           JOB_STATUS: ${{ job.status }}
         run: |
           {
