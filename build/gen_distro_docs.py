@@ -1,7 +1,11 @@
-#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["pyyaml>=6,<7"]
+# ///
+
+import re
 
 import yaml
-import re
 from pathlib import Path
 
 
@@ -13,7 +17,7 @@ def extract_ogx_version():
 
     Returns:
         tuple: (version, repo_owner) where repo_owner is extracted from
-               OGX_GIT_REPO in build.py or defaults to 'opendatahub-io'
+               OGX_GIT_REPO in gen_lockfile.py or defaults to 'opendatahub-io'
     """
     versions_path = REPO_ROOT / "build" / "build.env"
 
@@ -22,7 +26,7 @@ def extract_ogx_version():
         exit(1)
 
     env = {}
-    with open(versions_path, "r") as file:
+    with open(versions_path, "r", encoding="utf-8") as file:
         for line in file:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
@@ -50,7 +54,7 @@ def load_external_providers_info():
         exit(1)
 
     try:
-        with open(config_path, "r") as file:
+        with open(config_path, "r", encoding="utf-8") as file:
             config_data = yaml.safe_load(file)
 
         providers = config_data.get("providers", {})
@@ -91,7 +95,7 @@ def load_runtime_provider_types():
         print(f"Error: {config_path} not found")
         exit(1)
 
-    with open(config_path, "r") as file:
+    with open(config_path, "r", encoding="utf-8") as file:
         config_data = yaml.safe_load(file)
 
     runtime_types = set()
@@ -182,6 +186,57 @@ def gen_distro_table(providers_data, runtime_provider_types=None):
     return "\n".join(table_lines)
 
 
+def extract_file_secret_vars():
+    """Extract the secret env var names from entrypoint.sh's _FILE resolution loop."""
+    entrypoint = REPO_ROOT / "distribution" / "entrypoint.sh"
+    text = entrypoint.read_text(encoding="utf-8")
+    match = re.search(r"for _secret_var in\s*\\(.*?);\s*do", text, re.DOTALL)
+    if not match:
+        return []
+    body = match.group(1).replace("\\", " ")
+    return sorted(v for v in body.split() if v)
+
+
+def gen_file_secrets_section(secret_vars):
+    """Generate a markdown section documenting _FILE secret support."""
+    if not secret_vars:
+        return ""
+
+    var_list = "\n".join(f"- `{var}` → `{var}_FILE`" for var in secret_vars)
+
+    return f"""
+## Mounting Secrets as Files
+
+Instead of passing secrets directly as environment variables (which exposes them in
+`/proc/1/environ` and subprocess environments), you can mount them as files and
+point to them with `_FILE`-suffixed variables. At container startup, the entrypoint
+reads each file and populates the corresponding environment variable.
+
+For example, to inject `OPENAI_API_KEY` from a mounted Kubernetes Secret:
+
+```yaml
+env:
+  - name: OPENAI_API_KEY_FILE
+    value: /run/secrets/openai-api-key
+volumeMounts:
+  - name: openai-secret
+    mountPath: /run/secrets/openai-api-key
+    subPath: api-key
+    readOnly: true
+volumes:
+  - name: openai-secret
+    secret:
+      secretName: openai-credentials
+```
+
+Setting both the base variable and its `_FILE` variant is an error (mutually exclusive).
+
+### Supported variables
+
+{var_list}
+"""
+
+
 def gen_distro_docs():
     build_path = REPO_ROOT / "build" / "build.yaml"
     readme_path = REPO_ROOT / "distribution" / "README.md"
@@ -225,7 +280,7 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 """
 
     try:
-        with open(build_path, "r") as file:
+        with open(build_path, "r", encoding="utf-8") as file:
             build_data = yaml.safe_load(file)
 
         providers = build_data.get("providers", {})
@@ -246,8 +301,13 @@ You can see an overview of the APIs and Providers the image ships with in the ta
             "definitions.\n"
         )
 
-        with open(readme_path, "w") as readme_file:
-            readme_file.write(header + table_content + "\n" + dep_only_note)
+        secret_vars = extract_file_secret_vars()
+        file_secrets_section = gen_file_secrets_section(secret_vars)
+
+        with open(readme_path, "w", encoding="utf-8") as readme_file:
+            readme_file.write(
+                header + table_content + "\n" + dep_only_note + file_secrets_section
+            )
 
         print(f"Successfully generated {readme_path}")
         print(

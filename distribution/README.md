@@ -4,7 +4,7 @@
 
 This image contains the official Open Data Hub OGX distribution, with all the packages and configuration needed to run an OGX server in a containerized environment.
 
-The image is currently shipping with the Open Data Hub version of OGX version [1.2.0+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.2.0+rhaiv.0)
+The image is currently shipping with the Open Data Hub version of OGX version [1.2.1+rhaiv.0](https://github.com/opendatahub-io/ogx/releases/tag/v1.2.1+rhaiv.0)
 
 You can see an overview of the APIs and Providers the image ships with in the table below.
 
@@ -41,3 +41,50 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 | vector_io | remote::qdrant | No | ❌ | Set the `ENABLE_QDRANT` environment variable |
 
 \* **Dependency only** providers are not included in the default runtime `config.yaml` but their dependencies are pre-installed in the container image. To use them, pass a custom `config.yaml` at runtime that includes the provider definitions.
+
+## Mounting Secrets as Files
+
+Instead of passing secrets directly as environment variables (which exposes them in
+`/proc/1/environ` and subprocess environments), you can mount them as files and
+point to them with `_FILE`-suffixed variables. At container startup, the entrypoint
+reads each file and populates the corresponding environment variable.
+
+For example, to inject `OPENAI_API_KEY` from a mounted Kubernetes Secret:
+
+```yaml
+env:
+  - name: OPENAI_API_KEY_FILE
+    value: /run/secrets/openai-api-key
+volumeMounts:
+  - name: openai-secret
+    mountPath: /run/secrets/openai-api-key
+    subPath: api-key
+    readOnly: true
+volumes:
+  - name: openai-secret
+    secret:
+      secretName: openai-credentials
+```
+
+Setting both the base variable and its `_FILE` variant is an error (mutually exclusive).
+
+### Supported variables
+
+- `ANTHROPIC_API_KEY` → `ANTHROPIC_API_KEY_FILE`
+- `AWS_ACCESS_KEY_ID` → `AWS_ACCESS_KEY_ID_FILE`
+- `AWS_BEDROCK_BEARER_TOKEN` → `AWS_BEDROCK_BEARER_TOKEN_FILE`
+- `AWS_SECRET_ACCESS_KEY` → `AWS_SECRET_ACCESS_KEY_FILE`
+- `AZURE_API_KEY` → `AZURE_API_KEY_FILE`
+- `BRAVE_SEARCH_API_KEY` → `BRAVE_SEARCH_API_KEY_FILE`
+- `DOCLING_SERVE_API_KEY` → `DOCLING_SERVE_API_KEY_FILE`
+- `GEMINI_ACCESS_TOKEN` → `GEMINI_ACCESS_TOKEN_FILE`
+- `GEMINI_API_KEY` → `GEMINI_API_KEY_FILE`
+- `MILVUS_TOKEN` → `MILVUS_TOKEN_FILE`
+- `OPENAI_API_KEY` → `OPENAI_API_KEY_FILE`
+- `PGVECTOR_PASSWORD` → `PGVECTOR_PASSWORD_FILE`
+- `POSTGRES_PASSWORD` → `POSTGRES_PASSWORD_FILE`
+- `QDRANT_API_KEY` → `QDRANT_API_KEY_FILE`
+- `TAVILY_SEARCH_API_KEY` → `TAVILY_SEARCH_API_KEY_FILE`
+- `VLLM_API_TOKEN` → `VLLM_API_TOKEN_FILE`
+- `VLLM_EMBEDDING_API_TOKEN` → `VLLM_EMBEDDING_API_TOKEN_FILE`
+- `WATSONX_API_KEY` → `WATSONX_API_KEY_FILE`
