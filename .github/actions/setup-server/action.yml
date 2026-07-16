@@ -16,6 +16,15 @@ inputs:
     description: 'Volume mounts for docker run (one host:container:mode per line)'
     required: false
     default: ''
+  postgres_user:
+    description: 'PostgreSQL user'
+    default: 'ogx'
+  postgres_password:
+    description: 'PostgreSQL password'
+    default: 'ogx'
+  postgres_db:
+    description: 'PostgreSQL database name'
+    default: 'ogx'
 
 runs:
   using: "composite"
@@ -27,6 +36,9 @@ runs:
         IMAGE_TAG: ${{ inputs.image_tag }}
         INPUT_EXTRA_ENV: ${{ inputs.extra_env }}
         INPUT_VOLUMES: ${{ inputs.volumes }}
+        PG_USER: ${{ inputs.postgres_user }}
+        PG_PASSWORD: ${{ inputs.postgres_password }}
+        PG_DB: ${{ inputs.postgres_db }}
       run: |
         docker pull "$IMAGE_NAME:$IMAGE_TAG"
 
@@ -34,15 +46,15 @@ runs:
           -d --net=host --name ogx
           --env "POSTGRES_HOST=localhost"
           --env "POSTGRES_PORT=5432"
-          --env "POSTGRES_DB=ogx"
-          --env "POSTGRES_USER=ogx"
-          --env "POSTGRES_PASSWORD=ogx"
+          --env "POSTGRES_DB=${PG_DB}"
+          --env "POSTGRES_USER=${PG_USER}"
+          --env "POSTGRES_PASSWORD=${PG_PASSWORD}"
           --env "ENABLE_PGVECTOR=1"
           --env "PGVECTOR_HOST=localhost"
           --env "PGVECTOR_PORT=5432"
-          --env "PGVECTOR_DB=ogx"
-          --env "PGVECTOR_USER=ogx"
-          --env "PGVECTOR_PASSWORD=ogx"
+          --env "PGVECTOR_DB=${PG_DB}"
+          --env "PGVECTOR_USER=${PG_USER}"
+          --env "PGVECTOR_PASSWORD=${PG_PASSWORD}"
           --env "TRUSTYAI_LMEVAL_USE_K8S=False"
         )
 

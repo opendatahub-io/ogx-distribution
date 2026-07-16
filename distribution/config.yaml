@@ -201,17 +201,17 @@ storage:
       type: kv_postgres
       host: ${env.POSTGRES_HOST:=localhost}
       port: ${env.POSTGRES_PORT:=5432}
-      db: ${env.POSTGRES_DB:=ogx}
-      user: ${env.POSTGRES_USER:=ogx}
-      password: ${env.POSTGRES_PASSWORD:=ogx}
+      db: ${env.POSTGRES_DB:=}
+      user: ${env.POSTGRES_USER:=}
+      password: ${env.POSTGRES_PASSWORD:=}
       table_name: ${env.POSTGRES_TABLE_NAME:=ogx_kvstore}
     sql_default:
       type: sql_postgres
       host: ${env.POSTGRES_HOST:=localhost}
       port: ${env.POSTGRES_PORT:=5432}
-      db: ${env.POSTGRES_DB:=ogx}
-      user: ${env.POSTGRES_USER:=ogx}
-      password: ${env.POSTGRES_PASSWORD:=ogx}
+      db: ${env.POSTGRES_DB:=}
+      user: ${env.POSTGRES_USER:=}
+      password: ${env.POSTGRES_PASSWORD:=}
   stores:
     metadata:
       backend: kv_default
