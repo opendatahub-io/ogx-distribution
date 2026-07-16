@@ -21,3 +21,14 @@ updates:
       - python
     commit-message:
       prefix: chore(python-deps)
+  # Enable version updates for vLLM base container image
+  - package-ecosystem: "docker"
+    directory: "/vllm"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - type/dependencies
+      - vllm
+    commit-message:
+      prefix: chore(vllm)

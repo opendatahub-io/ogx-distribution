@@ -29,6 +29,18 @@ on:
         description: 'vLLM MaaS models (comma-separated, leave empty for defaults)'
         type: string
         default: ''
+      run_bedrock:
+        description: 'Run Bedrock tests'
+        type: boolean
+        default: true
+      bedrock_models:
+        description: 'Bedrock models (comma-separated, leave empty for defaults)'
+        type: string
+        default: ''
+      bedrock_region:
+        description: 'Bedrock AWS region (leave empty for repo/default)'
+        type: string
+        default: ''
 
 permissions:
   id-token: write
@@ -61,16 +73,27 @@ jobs:
       models: ${{ inputs.vllm_maas_models }}
     secrets: inherit
 
+  # ── Bedrock ────────────────────────────────────────────────────
+  test-bedrock:
+    if: github.event_name == 'schedule' || inputs.run_bedrock != false
+    uses: ./.github/workflows/responses-bedrock.yml
+    with:
+      models: ${{ inputs.bedrock_models }}
+      aws_region: ${{ inputs.bedrock_region }}
+    secrets:
+      AWS_BEDROCK_ROLE_ARN: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+      TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
+
   # ── Test Report & GitHub Pages ───────────────────────────────────
   report:
     name: Publish Test Report
     runs-on: ubuntu-24.04
     if: ${{ !cancelled() }}
-    needs: [test-openai, test-vertexai, test-vllm-maas]
+    needs: [test-openai, test-vertexai, test-vllm-maas, test-bedrock]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Determine deploy path
         id: deploy
@@ -97,18 +120,16 @@ jobs:
         run: find junit-results -type f 2>/dev/null || echo "No junit-results directory"
 
       - name: Get history from gh-pages
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         continue-on-error: true
         with:
           ref: gh-pages
           path: gh-pages
 
       - name: Build report
-        env:
-          OGX_VERSION: ""
         run: |
-          source distribution/versions.env
-          export OGX_VERSION="${OGX_VERSION}+${OGX_RHAI_VERSION}"
+          source build/build.env
+          export OGX_VERSION
 
           SUBFOLDER="${{ steps.deploy.outputs.subfolder }}"
           PUBLISH_DIR="publish/${SUBFOLDER}"
@@ -116,16 +137,16 @@ jobs:
 
           HISTORY_FILE="gh-pages/${SUBFOLDER:+$SUBFOLDER/}history.json"
 
-          python3 scripts/junit_to_history.py \
+          python3 .github/scripts/junit_to_history.py \
             junit-results \
             "$HISTORY_FILE" \
             "${PUBLISH_DIR}/history.json"
 
-          cp scripts/report-template.html "${PUBLISH_DIR}/index.html"
+          cp .github/scripts/report-template.html "${PUBLISH_DIR}/index.html"
 
       - name: Deploy to GitHub Pages
         if: ${{ !cancelled() }}
-        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: publish

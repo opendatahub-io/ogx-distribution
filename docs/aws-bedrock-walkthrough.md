@@ -7,8 +7,21 @@
 3. Generate a short-term (12h) API key. (Note the region, for example `us-west-2`) ([AWS docs about this](https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html)).
 4. On the terminal:
    ```shell
-   export AWS_BEARER_TOKEN_BEDROCK=bedrock-api-key-ABCdef123…
+   export ENABLE_BEDROCK=1
+   export AWS_BEDROCK_BEARER_TOKEN=bedrock-api-key-ABCdef123...
    ```
+
+# Using AWS IAM role authentication
+
+For Kubernetes deployments that use IRSA or pod identity, enable the provider and set the role inputs instead of a bearer token:
+
+```shell
+export ENABLE_BEDROCK=1
+export AWS_ROLE_ARN=arn:aws:iam::123456789012:role/bedrock-inference-role
+export AWS_WEB_IDENTITY_TOKEN_FILE=/var/run/secrets/eks.amazonaws.com/serviceaccount/token
+```
+
+The Bedrock provider uses STS AssumeRoleWithWebIdentity to obtain temporary credentials from the configured role and token file.
 
 # OpenAI API compatibility
 
@@ -17,7 +30,7 @@ You can use your bearer token with AWS Bedrock's OpenAI chat completions API ([d
 ```shell
 curl -X POST https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1/chat/completions \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $AWS_BEARER_TOKEN_BEDROCK" \
+    -H "Authorization: Bearer $AWS_BEDROCK_BEARER_TOKEN" \
     -d '{
     "model": "openai.gpt-oss-20b-1:0",
     "messages": [
@@ -43,7 +56,7 @@ You can use your bearer token with AWS Bedrock's proprietary `/converse` API ([d
 ```shell
 curl -X POST "https://bedrock-runtime.us-east-2.amazonaws.com/model/us.meta.llama3-1-8b-instruct-v1:0/converse" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $AWS_BEARER_TOKEN_BEDROCK" \
+    -H "Authorization: Bearer $AWS_BEDROCK_BEARER_TOKEN" \
     -d '{
     "messages": [
         {

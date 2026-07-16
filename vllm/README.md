@@ -15,9 +15,9 @@ This directory contains a Containerfile based on the official [vllm/vllm-openai-
 
 ```bash
 docker build . \
-    --build-arg INFERENCE_MODEL="Qwen/Qwen3-0.6B" \
+    --build-arg INFERENCE_MODEL="Qwen/Qwen3.5-0.8B" \
     --build-arg EMBEDDING_MODEL="ibm-granite/granite-embedding-125m-english" \
-    --tag vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english \
+    --tag vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english \
     --file vllm/Containerfile
 ```
 
@@ -28,10 +28,10 @@ For models that require authentication (e.g., gated models), provide your Huggin
 ```bash
 export HF_TOKEN="your_huggingface_token_here"
 docker build . \
-    --build-arg INFERENCE_MODEL="Qwen/Qwen3-0.6B" \
+    --build-arg INFERENCE_MODEL="Qwen/Qwen3.5-0.8B" \
     --build-arg EMBEDDING_MODEL="ibm-granite/granite-embedding-125m-english" \
     --secret id=hf_token,env=HF_TOKEN \
-    --tag vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english \
+    --tag vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english \
     --file vllm/Containerfile
 ```
 
@@ -47,15 +47,14 @@ The entrypoint is `vllm serve`, so pass model and serving arguments directly. Th
 ```bash
 docker run -d \
     --name vllm-inference \
-    --privileged=true \
     --net=host \
-    vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english \
+    vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english \
     --host 0.0.0.0 \
     --port 8000 \
     --enable-auto-tool-choice \
     --tool-call-parser hermes \
-    --model /root/.cache/Qwen/Qwen3-0.6B \
-    --served-model-name Qwen/Qwen3-0.6B \
+    --model /opt/vllm/models/Qwen/Qwen3.5-0.8B \
+    --served-model-name Qwen/Qwen3.5-0.8B \
     --max-model-len 8192
 ```
 
@@ -64,14 +63,13 @@ docker run -d \
 ```bash
 docker run -d \
     --name vllm-embedding \
-    --privileged=true \
     --net=host \
-    vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english \
+    vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english \
     --host 0.0.0.0 \
     --port 8001 \
-    --model /root/.cache/ibm-granite/granite-embedding-125m-english \
+    --model /opt/vllm/models/ibm-granite/granite-embedding-125m-english \
     --served-model-name ibm-granite/granite-embedding-125m-english
 ```
 
 > [!TIP]
-> Additional vLLM arguments can be passed directly. Models are stored under `/root/.cache/<model_id>`.
+> Additional vLLM arguments can be passed directly. Models are stored under `/opt/vllm/models/<model_id>`.

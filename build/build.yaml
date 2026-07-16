@@ -2,6 +2,7 @@ version: 2
 image_name: rh
 apis:
 - responses
+- messages
 - batches
 - inference
 - tool_runtime
@@ -26,11 +27,13 @@ providers:
       api_token: ${env.VLLM_EMBEDDING_API_TOKEN:=fake}
       tls_verify: ${env.VLLM_EMBEDDING_TLS_VERIFY:=true}
       refresh_models: ${env.VLLM_EMBEDDING_REFRESH_MODELS:=false}
-  - provider_id: ${env.AWS_BEARER_TOKEN_BEDROCK:+bedrock}
+  - provider_id: ${env.ENABLE_BEDROCK:+bedrock}
     provider_type: remote::bedrock
     config:
-      api_key: ${env.AWS_BEARER_TOKEN_BEDROCK:=}
+      aws_bedrock_bearer_token: ${env.AWS_BEDROCK_BEARER_TOKEN:=}
       region_name: ${env.AWS_DEFAULT_REGION:=us-east-2}
+      aws_role_arn: ${env.AWS_ROLE_ARN:=}
+      aws_web_identity_token_file: ${env.AWS_WEB_IDENTITY_TOKEN_FILE:=}
   - provider_id: sentence-transformers
     provider_type: inline::sentence-transformers
     config: {}
@@ -51,6 +54,7 @@ providers:
     provider_type: remote::vertexai
     config:
       project: ${env.VERTEX_AI_PROJECT:=}
+      location: ${env.VERTEX_AI_LOCATION:=global}
   - provider_id: ${env.OPENAI_API_KEY:+openai}
     provider_type: remote::openai
     config:
@@ -62,6 +66,10 @@ providers:
       api_key: ${env.GEMINI_API_KEY:=}
       access_token: ${env.GEMINI_ACCESS_TOKEN:=}
       project: ${env.GEMINI_AI_PROJECT:=}
+  - provider_id: ${env.ANTHROPIC_API_KEY:+anthropic}
+    provider_type: remote::anthropic
+    config:
+      api_key: ${env.ANTHROPIC_API_KEY:=}
   vector_io:
   - provider_id: milvus
     provider_type: inline::milvus
@@ -130,10 +138,20 @@ providers:
           table_name: agents_responses
           max_write_queue_size: 10000
           num_writers: 4
+  messages:
+  # Implements the Anthropic Messages API (/v1/messages). Native passthrough for
+  # providers that support it (e.g. vLLM); translates Anthropic <-> OpenAI Chat
+  # Completions for all other providers. Depends on the inference API.
+  - provider_id: builtin
+    provider_type: inline::builtin
+    config:
+      kvstore:
+        backend: kv_default
+        namespace: message_batches
   tool_runtime:
   # NOTE: inline::file-search requires a 'files' provider at runtime
   # (currently inline::localfs). Do not add inline::localfs to
-  # STRIPPED_PROVIDER_TYPES in build.py without also removing
+  # STRIPPED_PROVIDER_TYPES in gen_config.py without also removing
   # inline::file-search here.
   - provider_id: brave-search
     provider_type: remote::brave-search
@@ -173,9 +191,23 @@ providers:
         backend: sql_default
         table_name: files_metadata
   file_processors:
+  - provider_id: auto
+    provider_type: inline::auto
+    config: {}
+  - provider_id: docling
+    provider_type: inline::docling
+    config: {}
+  - provider_id: markitdown
+    provider_type: inline::markitdown
+    config: {}
   - provider_id: pypdf
     provider_type: inline::pypdf
     config: {}
+  - provider_id: ${env.DOCLING_SERVE_URL:+docling-serve}
+    provider_type: remote::docling-serve
+    config:
+      base_url: ${env.DOCLING_SERVE_URL:=}
+      api_key: ${env.DOCLING_SERVE_API_KEY:=}
   batches:
   - provider_id: reference
     provider_type: inline::reference
@@ -189,17 +221,17 @@ storage:
       type: kv_postgres
       host: ${env.POSTGRES_HOST:=localhost}
       port: ${env.POSTGRES_PORT:=5432}
-      db: ${env.POSTGRES_DB:=ogx}
-      user: ${env.POSTGRES_USER:=ogx}
-      password: ${env.POSTGRES_PASSWORD:=ogx}
+      db: ${env.POSTGRES_DB:=}
+      user: ${env.POSTGRES_USER:=}
+      password: ${env.POSTGRES_PASSWORD:=}
       table_name: ${env.POSTGRES_TABLE_NAME:=ogx_kvstore}
     sql_default:
       type: sql_postgres
       host: ${env.POSTGRES_HOST:=localhost}
       port: ${env.POSTGRES_PORT:=5432}
-      db: ${env.POSTGRES_DB:=ogx}
-      user: ${env.POSTGRES_USER:=ogx}
-      password: ${env.POSTGRES_PASSWORD:=ogx}
+      db: ${env.POSTGRES_DB:=}
+      user: ${env.POSTGRES_USER:=}
+      password: ${env.POSTGRES_PASSWORD:=}
   stores:
     metadata:
       backend: kv_default
@@ -218,6 +250,9 @@ storage:
     connectors:
       table_name: connectors
       backend: sql_default
+    vector_stores:
+      backend: sql_default
+      table_name: vector_store_metadata
 registered_resources:
   models:
   - metadata:
@@ -240,6 +275,7 @@ telemetry:
   enabled: true
 server:
   port: 8321
+  registry_refresh_interval_seconds: ${env.REGISTRY_REFRESH_INTERVAL_SECONDS:=300}
   auth:
     provider_config:
       type: ${env.AUTH_ISSUER:+oauth2_token}
@@ -249,6 +285,7 @@ server:
         uri: ${env.AUTH_JWKS_URI:=}
         key_recheck_period: ${env.AUTH_JWKS_RECHECK_PERIOD:=3600}
       verify_tls: ${env.AUTH_VERIFY_TLS:=true}
+      tls_cafile: ${env.AUTH_TLS_CAFILE:=}
     access_policy:
       - permit:
           actions: [read]

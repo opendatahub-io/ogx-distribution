@@ -1,0 +1,143 @@
+name: Test Upstream in Showroom
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # daily at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      catalog_image:
+        description: 'OLM catalog image (optional, uses default if not specified)'
+        required: false
+        type: string
+      operator_image:
+        description: 'Operator image (optional, uses default if not specified)'
+        required: false
+        type: string
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: openshift-cluster-1
+      cancel-in-progress: false
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          path: ogx-distribution
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      - name: Regenerate distribution artifacts
+        uses: ./ogx-distribution/.github/actions/regenerate-artifacts
+        with:
+          ogx-version: main
+          working-directory: ogx-distribution
+
+      - name: Build image
+        id: build
+        working-directory: ogx-distribution
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          TAG="upstream-main-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building image with OGX_VERSION=main: ogx-test:$TAG"
+          podman build -f Containerfile -t "ogx-test:$TAG" .
+
+      - name: Setup CI environment
+        id: setup
+        uses: opendatahub-io/ogx-showroom@a3a6adc939c464c9acc7f224482f5dacbf83558d  # main as of 2026-06-09
+        with:
+          catalog_image: ${{ inputs.catalog_image }}
+          ogx_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
+          operator_image: ${{ inputs.operator_image }}
+          oc_server: ${{ secrets.OC_SERVER }}
+          oc_token: ${{ secrets.OC_TOKEN }}
+          env: |
+            SHOWROOM_PULL_SECRET=${{ secrets.SHOWROOM_PULL_SECRET }}
+            SHOWROOM_VLLM_URL=https://llama-3-2-3b-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
+            SHOWROOM_VLLM_API_TOKEN=${{ secrets.SHOWROOM_VLLM_API_TOKEN }}
+            SHOWROOM_VLLM_EMBEDDING_URL=https://nomic-embed-text-v1-5-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
+            SHOWROOM_VLLM_EMBEDDING_API_TOKEN=${{ secrets.SHOWROOM_VLLM_EMBEDDING_API_TOKEN }}
+            SHOWROOM_OPENAI_API_KEY=${{ secrets.SHOWROOM_OPENAI_API_KEY }}
+
+      - name: Push image to OpenShift registry
+        id: push
+        run: |
+          "${{ steps.setup.outputs.scripts_dir }}/push-image-to-registry.sh" \
+            ogx-test:${{ steps.build.outputs.tag }} \
+            redhat-ods-operator \
+            ogx-test:${{ steps.build.outputs.tag }}
+
+      - name: Run setup.sh
+        id: run-setup
+        run: |
+          "${{ steps.setup.outputs.scripts_dir }}/setup.sh"
+
+      - name: Run provision.sh
+        id: provision
+        run: |
+          "${{ steps.setup.outputs.scripts_dir }}/provision.sh"
+
+      - name: Run tests
+        id: tests
+        run: |
+          cd "${{ steps.setup.outputs.scripts_dir }}"
+          ./test.sh
+
+      - name: Debug - Capture OpenShift state
+        if: always()
+        run: |
+          echo -e "\n=== Recent Events ==="
+          oc get events -n redhat-ods-applications --sort-by='.lastTimestamp' \
+            -o custom-columns=TIME:.lastTimestamp,TYPE:.type,REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message
+
+          echo -e "\n=== All Resources ==="
+          oc get all -n redhat-ods-applications
+
+          echo -e "\n=== Pod Logs (first 5 lines) ==="
+          oc logs -n redhat-ods-applications -l app=ogx --tail=-1 | head -5 || echo "No logs available"
+
+          echo -e "\n=== Pod Logs (last 150 lines) ==="
+          oc logs -n redhat-ods-applications --tail=150 -l app=ogx || echo "No logs available"
+
+          echo -e "\n=== OGX Operator Logs (last 50 lines) ==="
+          oc logs -n redhat-ods-applications --tail=50 -l app.kubernetes.io/part-of=ogx || echo "No OGX operator logs available"
+
+      - name: Run unprovision.sh
+        if: always()
+        run: |
+          "${{ steps.setup.outputs.scripts_dir }}/unprovision.sh"
+
+      - name: Run cleanup.sh
+        if: always()
+        run: |
+          "${{ steps.setup.outputs.scripts_dir }}/cleanup.sh"
+
+      - name: Output summary
+        if: always()
+        env:
+          IMAGE_TAG: ${{ steps.build.outputs.tag }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "# Test Upstream in Showroom - Summary"
+            echo ""
+            echo "## Build Information"
+            echo "- **OGX Version**: \`main\` (upstream)"
+            echo "- **Commit SHA**: ${GITHUB_SHA}"
+            echo "- **Image Tag**: \`${IMAGE_TAG}\`"
+            echo ""
+            echo "## Test Results"
+            if [ "$JOB_STATUS" = "success" ]; then
+              echo "✅ All tests passed successfully!"
+            else
+              echo "❌ Tests failed. Check the logs above for details."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

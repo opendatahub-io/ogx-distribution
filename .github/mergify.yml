@@ -1,4 +1,14 @@
 pull_request_rules:
+  - name: keep PRs up to date with main
+    conditions:
+      - -conflict
+      - -draft
+      - -closed
+      - -merged
+      - label!=do-not-merge
+    actions:
+      update: {}
+
   - name: auto-merge github-deps
     description: >
       Automatic merge of dependency update PRs (single approval required)
@@ -9,6 +19,7 @@ pull_request_rules:
       - or:
           - base=main
           - base~=^rhoai-v
+          - base~=^release-
       - label!=do-not-merge
       - label!=needs-rebase
       - check-success=pre-commit
@@ -35,6 +46,7 @@ pull_request_rules:
       - or:
           - base=main
           - base~=^rhoai-v
+          - base~=^release-
       - label!=do-not-merge
       - label!=needs-rebase
       - check-success=pre-commit
@@ -47,12 +59,14 @@ pull_request_rules:
               - or:
                   - files~=^\.github/actions/setup-vllm/action\.yml$
                   - files~=^\.github/workflows/redhat-distro-container\.yml$
+                  - files~=^Containerfile$
                   - files~=^distribution/
                   - files~=^tests/
                   - files~=^vllm/
           - and:
               - -files~=^\.github/actions/setup-vllm/action\.yml$
               - -files~=^\.github/workflows/redhat-distro-container\.yml$
+              - -files~=^Containerfile$
               - -files~=^distribution/
               - -files~=^tests/
               - -files~=^vllm/
@@ -94,12 +108,12 @@ pull_request_rules:
 
   - name: remind about Konflux Dockerfile when Containerfile changes
     conditions:
-      - files~=^distribution/Containerfile.in$
+      - files~=^Containerfile$
       - -closed
     actions:
       comment:
         message: >
-          ⚠️ **Heads up!** This PR modifies `distribution/Containerfile.in`.
+          ⚠️ **Heads up!** This PR modifies `Containerfile`.
 
           A corresponding change may be needed in the Konflux Dockerfile:
           https://github.com/red-hat-data-services/ogx-distribution/blob/main/Dockerfile.konflux

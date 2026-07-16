@@ -1,0 +1,98 @@
+metadata:
+  version: "1.0"
+artifacts:
+  # tiktoken cl100k_base
+  # Cache key is the SHA-1 of the download URL (how tiktoken resolves cache filenames).
+  - download_url: https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken
+    checksum: "sha256:223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"
+    filename: .cache/tiktoken/9b5ad71b2ce5302211f9c61530b329a4922fc6a4
+
+  # ibm-granite/granite-embedding-125m-english
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/1_Pooling/config.json
+    checksum: "sha256:d81961da36b56f4a1abfbf59a2469e1c49efa04b94a876908c48780894b0b307"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/1_Pooling/config.json
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/config.json
+    checksum: "sha256:03a972cfc5b95a0cc78c353b566adf9f28050012e65f0d963eb87ab5c5febc70"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/config.json
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/model.safetensors
+    checksum: "sha256:ee70cb80637b769409e4ccfde7d188bb2c564495d1a63cde3ca60741b2a7302d"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/model.safetensors
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/modules.json
+    checksum: "sha256:21ddb3037a55ebf4549eb5c1dc44c3f28f10b56ec7f1335c92fd90e5b30d88ac"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/modules.json
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/sentence_bert_config.json
+    checksum: "sha256:ed20daeb5b882c3e1f116ce7b3d53e6643d11063aa9baaa31f5ae91770cfad8f"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/sentence_bert_config.json
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/special_tokens_map.json
+    checksum: "sha256:8293ae960b0a0852d4d3813118030a1149a3ed9fe37bc2e1e7b3c2e62eb2d4b7"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/special_tokens_map.json
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/tokenizer.json
+    checksum: "sha256:8f886f015981a7a64053bf0cadccb44b2bd761c3e90856c6fd32adf30d60f365"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/tokenizer.json
+  - download_url: https://huggingface.co/ibm-granite/granite-embedding-125m-english/resolve/4ab61ffd423be45cd932b21a7c696063d82bf45f/tokenizer_config.json
+    checksum: "sha256:a0d8f05ceb91e0024dadaa15d7bc8adbba60e405232b112162f85d7115198ced"
+    filename: .cache/huggingface/hub/models--ibm-granite--granite-embedding-125m-english/snapshots/prefetched/tokenizer_config.json
+
+  # docling-project/docling-layout-heron
+  - download_url: https://huggingface.co/docling-project/docling-layout-heron/resolve/8f39ad3c0b4c58e9c2d2c84a38465abf757272d8/config.json
+    checksum: "sha256:fdea30805ce2f5666b147fca941dcdd27ad468e27d6ed21902207d3da056a97d"
+    filename: .cache/docling/models/docling-project--docling-layout-heron/config.json
+  - download_url: https://huggingface.co/docling-project/docling-layout-heron/resolve/8f39ad3c0b4c58e9c2d2c84a38465abf757272d8/model.safetensors
+    checksum: "sha256:00333a43451945aaf89db8ca9c0a17e75d1537c17db60fdb91aa95f4c7929e0c"
+    filename: .cache/docling/models/docling-project--docling-layout-heron/model.safetensors
+  - download_url: https://huggingface.co/docling-project/docling-layout-heron/resolve/8f39ad3c0b4c58e9c2d2c84a38465abf757272d8/preprocessor_config.json
+    checksum: "sha256:cd38cd59999e7a95d68e487fbe5132df3d4e5c32a0836add57e6126ba0c4eaf1"
+    filename: .cache/docling/models/docling-project--docling-layout-heron/preprocessor_config.json
+
+  # docling-project/docling-models rev v2.3.0
+  - download_url: https://huggingface.co/docling-project/docling-models/resolve/v2.3.0/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors
+    checksum: "sha256:2a7d6c924b3cd12fb99a09280ca9c33a89c5d60b93253617d2e088c1a40374d9"
+    filename: .cache/docling/models/docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors
+  - download_url: https://huggingface.co/docling-project/docling-models/resolve/v2.3.0/model_artifacts/tableformer/accurate/tm_config.json
+    checksum: "sha256:984e122ceb8ccf84d84c9d2882f6f2302a44b4f1e577babd6289892c36f3cffd"
+    filename: .cache/docling/models/docling-project--docling-models/model_artifacts/tableformer/accurate/tm_config.json
+
+  # docling-project/DocumentFigureClassifier-v2.5
+  - download_url: https://huggingface.co/docling-project/DocumentFigureClassifier-v2.5/resolve/f859dfbff5c9916cd996942d4b0db7fa25808220/config.json
+    checksum: "sha256:dbed0349fb8b12fad95d8ff7f43b062c40971e06d9d957b25e90d91dfd3bd77e"
+    filename: .cache/docling/models/docling-project--DocumentFigureClassifier-v2.5/config.json
+  - download_url: https://huggingface.co/docling-project/DocumentFigureClassifier-v2.5/resolve/f859dfbff5c9916cd996942d4b0db7fa25808220/model.safetensors
+    checksum: "sha256:6bf1e44d6bce316dcade6eb9929d8f8d23b6e8d9d29062b3b4011cff87c7c3cd"
+    filename: .cache/docling/models/docling-project--DocumentFigureClassifier-v2.5/model.safetensors
+  - download_url: https://huggingface.co/docling-project/DocumentFigureClassifier-v2.5/resolve/f859dfbff5c9916cd996942d4b0db7fa25808220/preprocessor_config.json
+    checksum: "sha256:118dc069572036346fbacc3e15586089d3f8a9aaf9036c0c54b4666236a28032"
+    filename: .cache/docling/models/docling-project--DocumentFigureClassifier-v2.5/preprocessor_config.json
+
+  # RapidAI/RapidOCR v3.8.0 from modelscope
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx
+    checksum: "sha256:e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+    filename: .cache/docling/models/RapidOcr/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv4/det/ch_PP-OCRv4_det_mobile.onnx
+    checksum: "sha256:d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9"
+    filename: .cache/docling/models/RapidOcr/onnx/PP-OCRv4/det/ch_PP-OCRv4_det_mobile.onnx
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv4/det/en_PP-OCRv3_det_mobile.onnx
+    checksum: "sha256:ea07c15d38ac40cd69da3c493444ec75b44ff23840553ff8ba102c1219ed39c2"
+    filename: .cache/docling/models/RapidOcr/onnx/PP-OCRv4/det/en_PP-OCRv3_det_mobile.onnx
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile.onnx
+    checksum: "sha256:48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b"
+    filename: .cache/docling/models/RapidOcr/onnx/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile.onnx
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/onnx/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile.onnx
+    checksum: "sha256:e8770c967605983d1570cdf5352041dfb68fa0c21664f49f47b155abd3e0e318"
+    filename: .cache/docling/models/RapidOcr/onnx/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile.onnx
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/paddle/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile/ppocr_keys_v1.txt
+    checksum: "sha256:28b2362ad4ab2dc38769aa72feb535e3a9ddb3fd2a7585a05920e6393b1dc7f7"
+    filename: .cache/docling/models/RapidOcr/paddle/PP-OCRv4/rec/ch_PP-OCRv4_rec_mobile/ppocr_keys_v1.txt
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/paddle/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile/en_dict.txt
+    checksum: "sha256:5662df9d2d03f0e8ca0d3b0649d6acbab904b6a14b3d3521463c71c37c668ce3"
+    filename: .cache/docling/models/RapidOcr/paddle/PP-OCRv4/rec/en_PP-OCRv4_rec_mobile/en_dict.txt
+  - download_url: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.8.0/resources/fonts/FZYTK.TTF
+    checksum: "sha256:4065a23df6823c8e2b69a0e76d02f02a6470b8774a5e91086609701ad95cc33f"
+    filename: .cache/docling/models/RapidOcr/resources/fonts/FZYTK.TTF
+
+  # sentence-transformers/all-MiniLM-L6-v2 tokenizer
+  - download_url: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer.json
+    checksum: "sha256:be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037"
+    filename: .cache/docling/models/all-MiniLM-L6-v2/tokenizer.json
+  - download_url: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer_config.json
+    checksum: "sha256:acb92769e8195aabd29b7b2137a9e6d6e25c476a4f15aa4355c233426c61576b"
+    filename: .cache/docling/models/all-MiniLM-L6-v2/tokenizer_config.json

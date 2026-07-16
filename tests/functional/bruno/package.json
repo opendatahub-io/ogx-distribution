@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@usebruno/cli": "^3.2.1"
+  },
+  "scripts": {
+    "bruno:run": "cd ogx-api && bru run . -r"
+  }
+}

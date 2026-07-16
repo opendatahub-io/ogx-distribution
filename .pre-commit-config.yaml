@@ -1,5 +1,3 @@
-exclude: 'build/'
-
 default_language_version:
     python: python3.12
 
@@ -19,7 +17,6 @@ repos:
     -   id: check-yaml
         args: ["--unsafe"]
     -   id: detect-private-key
-    -   id: requirements-txt-fixer
     -   id: mixed-line-ending
         args: [--fix=lf] # Forces to replace line ending by LF (line feed)
     -   id: check-executables-have-shebangs
@@ -47,23 +44,41 @@ repos:
 
 -   repo: local
     hooks:
-      - id: pkg-gen
-        name: Distribution Build
-        entry: ./distribution/build.py
-        language: python
+      - id: gen-config
+        name: Generate config.yaml
+        entry: uv run build/gen_config.py
+        language: system
         pass_filenames: false
         require_serial: true
         always_run: true
-        additional_dependencies:
-          - uv>=0.9.0
-          - ruamel.yaml>=0.18.0
+
+      - id: gen-containerfile
+        name: Generate Containerfile
+        entry: uv run build/gen_containerfile.py
+        language: system
+        pass_filenames: false
+        require_serial: true
+        always_run: true
+
+      - id: verify-secrets
+        name: Verify _FILE secret sync
+        entry: uv run build/verify_secrets.py
+        language: system
+        pass_filenames: false
+        require_serial: true
+        always_run: true
 
       - id: doc-gen
         name: Distribution Documentation
-        entry: ./scripts/gen_distro_docs.py
-        language: python
+        entry: uv run build/gen_distro_docs.py
+        language: system
         pass_filenames: false
         require_serial: true
-        files: ^distribution/((build|config)\.yaml|Containerfile)$
-        additional_dependencies:
-          - pyyaml==6.0.2
+        files: ^(build/(build\.yaml|build\.env)|distribution/config\.yaml)$
+
+      - id: check-secret-scrub
+        name: CI log-scrub list matches smoke.sh secrets
+        entry: ./tests/check_secret_scrub_list.sh
+        language: script
+        pass_filenames: false
+        files: ^(tests/smoke\.sh|\.github/workflows/redhat-distro-container\.yml)$

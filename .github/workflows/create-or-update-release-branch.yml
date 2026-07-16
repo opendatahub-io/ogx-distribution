@@ -1,0 +1,162 @@
+name: Create or Update Release Branch
+
+run-name: "Create or update release-${{ github.event.client_payload.product_version }} from tag ${{ github.event.client_payload.tag }}"
+
+on:
+  repository_dispatch:
+    types: [create-or-update-release-branch]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.client_payload.product_version }}
+  cancel-in-progress: false
+
+jobs:
+  create-or-update-release-branch:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.client_payload.tag }}
+      BRANCH: release-${{ github.event.client_payload.product_version }}
+      WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
+      SLACK_GROUP: S0AHXK52HGD
+    steps:
+      - name: Log source run
+        if: github.event.client_payload.source_run_url != ''
+        env:
+          SOURCE_RUN_URL: ${{ github.event.client_payload.source_run_url }}
+        run: echo "Triggered by ${SOURCE_RUN_URL}"
+
+      - name: Validate tag format
+        run: |
+          if [[ -z "${TAG}" ]]; then
+            echo "::error::Missing 'tag' in repository_dispatch client_payload"
+            exit 1
+          fi
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\+rhaiv\.[0-9]+$ ]]; then
+            echo "::error::Invalid tag format '${TAG}'. Expected format: vX.Y.Z[.B]+rhaiv.N (e.g., v0.5.0+rhaiv.0)"
+            exit 1
+          fi
+          echo "Tag format '${TAG}' is valid"
+
+      - name: Validate product_version format
+        env:
+          PRODUCT_VERSION: ${{ github.event.client_payload.product_version }}
+        run: |
+          if [[ -z "${PRODUCT_VERSION}" ]]; then
+            echo "::error::Missing 'product_version' in repository_dispatch client_payload"
+            exit 1
+          fi
+          if [[ ! "${PRODUCT_VERSION}" =~ ^[0-9]+\.[0-9]+(-ea\.[0-9]+)?$ ]]; then
+            echo "::error::Invalid product_version format '${PRODUCT_VERSION}'. Expected format: <major>.<minor> or <major>.<minor>-ea.<N> (e.g., 3.4 or 3.4-ea.1)"
+            exit 1
+          fi
+          echo "product_version format '${PRODUCT_VERSION}' is valid"
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create or checkout release branch
+        run: |
+          if git rev-parse --verify "refs/remotes/origin/${BRANCH}" >/dev/null 2>&1; then
+            git checkout "${BRANCH}"
+            echo "Checked out existing branch '${BRANCH}'"
+          else
+            git checkout -b "${BRANCH}"
+            echo "Created branch '${BRANCH}' from main"
+          fi
+
+      - name: Update OGX_VERSION in build.env
+        run: |
+          sed -i "s|^OGX_VERSION=.*|OGX_VERSION=${TAG}|" build/build.env
+          if ! grep -q "^OGX_VERSION=${TAG}$" build/build.env; then
+            echo "::error::Failed to update OGX_VERSION in build/build.env"
+            exit 1
+          fi
+          echo "Updated OGX_VERSION to ${TAG}"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Regenerate distribution artifacts
+        uses: ./.github/actions/regenerate-artifacts
+        with:
+          ogx-version: ${{ env.TAG }}
+
+      - name: Run pre-commit
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        env:
+          SKIP: no-commit-to-branch
+
+      - name: Pin base image in Containerfile
+        env:
+          BASE_IMAGE_NAME: quay.io/opendatahub/odh-midstream-python-base-3-12
+        run: |
+          if ! grep -q "^FROM ${BASE_IMAGE_NAME}:latest" Containerfile; then
+            echo "Base image is not set to :latest, skipping pin"
+            exit 0
+          fi
+          DIGEST=$(docker buildx imagetools inspect "${BASE_IMAGE_NAME}:latest" 2>/dev/null \
+            | grep -m1 '^Digest:' | awk '{print $2}')
+          if [[ -z "${DIGEST}" ]]; then
+            echo "::error::Failed to resolve digest for ${BASE_IMAGE_NAME}:latest"
+            exit 1
+          fi
+          sed -i "s|^FROM ${BASE_IMAGE_NAME}:latest|FROM ${BASE_IMAGE_NAME}@${DIGEST}|" Containerfile
+          echo "Pinned base image to ${BASE_IMAGE_NAME}@${DIGEST}"
+
+      - name: Commit and push
+        id: commit
+        run: |
+          git add build/build.env Containerfile \
+            distribution/config.yaml \
+            distribution/requirements-lock.txt distribution/requirements-lock-konflux.txt \
+            distribution/README.md
+          if git diff --cached --quiet; then
+            echo "::notice::No changes to commit — version may already be set to ${TAG}"
+          else
+            git commit -m "chore: update ogx to ${TAG} for ${BRANCH}"
+          fi
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "commit_sha=${COMMIT_SHA}" >> "${GITHUB_OUTPUT}"
+          git push origin "${BRANCH}"
+          echo "Successfully pushed branch '${BRANCH}'"
+
+      - name: Notify Slack (success)
+        if: success()
+        env:
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.commit.outputs.commit_sha }}
+          COMMIT_SHA: ${{ steps.commit.outputs.commit_sha }}
+        run: |
+          TEXT=$(printf '%s\n%s\n%s\n%s' \
+            ":greenchecked: *Release branch \`${BRANCH}\` created/updated with OGX \`${TAG}\`*" \
+            "Commit: <${COMMIT_URL}|${COMMIT_SHA:0:7}>" \
+            "<${WORKFLOW_URL}|View workflow run>" \
+            "cc <!subteam^${SLACK_GROUP}> — please perform a cursory check of the commit")
+
+          .github/actions/notify-slack/notify.sh "$TEXT" \
+            || echo "::warning::Failed to send Slack notification"
+
+      - name: Notify Slack (failure)
+        if: failure()
+        run: |
+          TEXT=$(printf '%s\n%s\n%s\n%s' \
+            ":failed: *Failed to create/update release branch \`${BRANCH}\`*" \
+            "Tag: \`${TAG}\`" \
+            "<${WORKFLOW_URL}|View workflow run>" \
+            "cc <!subteam^${SLACK_GROUP}>")
+
+          .github/actions/notify-slack/notify.sh "$TEXT" "#d00000" \
+            || echo "::warning::Failed to send Slack notification"

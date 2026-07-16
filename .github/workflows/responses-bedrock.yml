@@ -1,0 +1,286 @@
+name: "Responses: Bedrock"
+
+on:
+  workflow_call:
+    inputs:
+      models:
+        description: 'Comma-separated model IDs to test (leave empty for defaults)'
+        required: false
+        type: string
+        default: ''
+      aws_region:
+        description: 'AWS region to use for Bedrock tests (leave empty for repo/default)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      AWS_BEDROCK_ROLE_ARN:
+        description: 'IAM role assumed by GitHub Actions through OIDC'
+        required: false
+      TAVILY_SEARCH_API_KEY:
+        description: 'Tavily API key used by Responses tests'
+        required: false
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: 'Image digest to test'
+        required: false
+        default: 'sha256:d367cb4be5da1028f90a962ea24d9804c8ea35d6463488c7741196bd948b3bbc'
+        type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: TEST_MODELS_BEDROCK)'
+        required: false
+        type: string
+      aws_region:
+        description: 'AWS region to use for Bedrock tests (default: repo/default)'
+        required: false
+        type: string
+
+env:
+  PROVIDER_NAME: bedrock
+  EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
+  IMAGE_DIGEST: ${{ inputs.image_digest || 'sha256:d367cb4be5da1028f90a962ea24d9804c8ea35d6463488c7741196bd948b3bbc' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
+      aws_region: ${{ steps.region.outputs.value }}
+    steps:
+      - name: Check Bedrock credentials
+        id: check
+        env:
+          AWS_BEDROCK_ROLE_ARN: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_BEDROCK_ROLE_ARN" ]; then
+            echo "::warning::AWS_BEDROCK_ROLE_ARN not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve models
+        id: models
+        env:
+          INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_BEDROCK }}
+        run: |
+          default='["bedrock/openai.gpt-oss-20b-1:0"]'
+          if [ -z "$INPUT_MODELS" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(printf '%s' "$INPUT_MODELS" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve AWS region
+        id: region
+        env:
+          INPUT_REGION: ${{ inputs.aws_region || vars.AWS_BEDROCK_REGION || vars.AWS_DEFAULT_REGION }}
+        run: |
+          region="${INPUT_REGION:-us-east-2}"
+          echo "value=$region" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJson(needs.check.outputs.models_json) }}
+    permissions:
+      id-token: write
+      contents: read
+      checks: write
+    env:
+      AWS_DEFAULT_REGION: ${{ needs.check.outputs.aws_region }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Validate Bedrock configuration
+        env:
+          AWS_BEDROCK_ROLE_ARN: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+        run: |
+          missing=()
+          [ -z "$AWS_BEDROCK_ROLE_ARN" ] && missing+=("AWS_BEDROCK_ROLE_ARN")
+          [ -z "$AWS_DEFAULT_REGION" ] && missing+=("AWS_BEDROCK_REGION/AWS_DEFAULT_REGION")
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf '::error::Missing required Bedrock config: %s\n' "$(IFS=,; echo "${missing[*]}")"
+            exit 1
+          fi
+
+      - name: Setup PostgreSQL
+        uses: ./.github/actions/setup-postgres
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+          role-session-name: GitHubActions-Bedrock-${{ github.run_id }}
+
+      - name: Patch config for Bedrock tests
+        shell: bash
+        env:
+          MODEL: ${{ matrix.model }}
+        run: |
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::image_digest must be a sha256 digest"
+            exit 1
+          fi
+          image_ref="$IMAGE_NAME@$IMAGE_DIGEST"
+          docker pull "$image_ref"
+          docker create --name ogx-cfg "$image_ref" true > /dev/null
+          docker cp ogx-cfg:/opt/app-root/config.yaml /tmp/config-patched.yaml
+          docker rm ogx-cfg > /dev/null
+          python3 - <<'PY'
+          import os
+
+          import yaml
+
+          model = os.environ["MODEL"]
+          cfg = yaml.safe_load(open('/tmp/config-patched.yaml'))
+          inference_providers = cfg.setdefault('providers', {}).setdefault('inference', [])
+          bedrock_provider = next(
+              (p for p in inference_providers if p.get('provider_type') == 'remote::bedrock'),
+              None,
+          )
+          if bedrock_provider is None:
+              inference_providers.append({
+                  'provider_id': 'bedrock',
+                  'provider_type': 'remote::bedrock',
+                  'config': {'region_name': os.environ['AWS_DEFAULT_REGION']},
+              })
+          else:
+              bedrock_provider['provider_id'] = 'bedrock'
+              bedrock_provider.setdefault('config', {})['region_name'] = os.environ['AWS_DEFAULT_REGION']
+          if not any(p.get('provider_id') == 'sentence-transformers' for p in inference_providers):
+              inference_providers.append({
+                  'provider_id': 'sentence-transformers',
+                  'provider_type': 'inline::sentence-transformers',
+                  'config': {},
+              })
+          cfg.setdefault('registered_resources', {}).setdefault('models', []).append({
+              'metadata': {},
+              'model_id': model,
+              'provider_id': 'bedrock',
+              'provider_model_id': model.removeprefix('bedrock/'),
+              'model_type': 'llm',
+          })
+          yaml.dump(cfg, open('/tmp/config-patched.yaml', 'w'), default_flow_style=False)
+          PY
+
+      - name: Setup server
+        uses: ./.github/actions/setup-server
+        with:
+          image_name: ${{ env.IMAGE_NAME }}
+          image_digest: ${{ env.IMAGE_DIGEST }}
+          volumes: |
+            /tmp/config-patched.yaml:/opt/app-root/config-patched.yaml:ro
+          extra_env: |
+            AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
+            AWS_SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
+            AWS_DEFAULT_REGION=${{ env.AWS_DEFAULT_REGION }}
+            RUN_CONFIG_PATH=/opt/app-root/config-patched.yaml
+            TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+            EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+            EMBEDDING_PROVIDER=sentence-transformers
+            EMBEDDING_PROVIDER_MODEL_ID=all-MiniLM-L6-v2
+
+      - name: Clone upstream tests
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/ogx-ai/ogx.git /tmp/ogx-tests
+          cd /tmp/ogx-tests
+          git fetch --depth 1 origin 9769a91c543e527389707e8a342339528d23c9f5 # v1.0.0
+          git checkout 9769a91c543e527389707e8a342339528d23c9f5
+
+          uv venv --clear
+          source .venv/bin/activate
+          uv pip install -e . \
+            'ogx-client==1.0.0' \
+            'ollama==0.6.0' \
+            'openai==2.30.0' \
+            'pytest==8.4.2' \
+            'langchain-openai==1.1.9' \
+            'langgraph==1.1.6'
+
+      - name: Derive short model name
+        id: model
+        env:
+          FULL_MODEL: ${{ matrix.model }}
+        run: |
+          short="${FULL_MODEL##*/}"
+          short="${short//:/-}"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+
+      - name: Run responses tests
+        shell: bash
+        env:
+          MODEL: ${{ matrix.model }}
+          SHORT: ${{ steps.model.outputs.short }}
+        run: |
+          cd /tmp/ogx-tests
+          source .venv/bin/activate
+          mkdir -p /tmp/test-results
+
+          # Exercise the Bedrock contract shared by both client fixtures. The
+          # full Responses suite includes provider-specific features such as
+          # file search, structured output, and tool variants.
+          TEST_SELECTOR="(test_response_non_streaming_basic and earth) or test_response_streaming_basic"
+
+          python -m pytest -s -v tests/integration/responses/ \
+            -k "$TEST_SELECTOR" \
+            --stack-config=server:"$GITHUB_WORKSPACE/distribution/config.yaml" \
+            --text-model="$MODEL" \
+            --embedding-model="$EMBEDDING_MODEL" \
+            --inference-mode=live \
+            --junit-xml="/tmp/test-results/results_${PROVIDER_NAME}_${SHORT}.xml" \
+            || [ $? -eq 5 ]
+
+      - name: Publish test report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "${{ env.PROVIDER_NAME }}/${{ steps.model.outputs.short }}"
+          path: /tmp/test-results/*.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+
+      - name: Scrub secrets from test results
+        if: ${{ !cancelled() }}
+        env:
+          TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
+        run: |
+          ./tests/scrub_secrets.sh '/tmp/test-results/*' \
+            AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \
+            TAVILY_SEARCH_API_KEY
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: responses-${{ env.PROVIDER_NAME }}-${{ steps.model.outputs.short }}
+          path: /tmp/test-results/
+          retention-days: 90
+
+      - name: Cleanup
+        if: ${{ !cancelled() }}
+        run: |
+          for c in ogx postgres; do
+            docker rm -f "$c" 2>/dev/null || true
+          done

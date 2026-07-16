@@ -10,6 +10,7 @@ All test scripts live in the `tests/` directory:
 |------|---------|
 | `smoke.sh` | Smoke tests against a running OGX container |
 | `run_integration_tests.sh` | Integration tests using upstream ogx's pytest suite |
+| `messages_agent_sdk.py` | Basic Claude Agent SDK session against the Messages API |
 | `test_utils.sh` | Shared utility functions (e.g., `validate_model_parameter`) |
 
 ### Smoke Tests (`smoke.sh`)
@@ -19,7 +20,10 @@ Smoke tests verify the container image works end-to-end. The script:
 1. **Starts the OGX container** with environment variables for inference models, embedding models, and database configuration, then waits up to 60 seconds for the `/v1/health` endpoint to return `OK`.
 2. **Model listing** - Verifies each configured model appears in the `/v1/models` response.
 3. **OpenAI-compatible inference** - Sends a chat completion request to `/v1/chat/completions` and validates the response.
-4. **PostgreSQL verification** - Checks that expected database tables (`ogx_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
+4. **Messages API** - Sends a single-turn request to the Anthropic-compatible `/v1/messages` endpoint and validates the response shape (a `message` from the `assistant` with a non-empty text block).
+5. **PostgreSQL verification** - Checks that expected database tables (`ogx_kvstore`, `inference_store`) exist, then verifies that `inference_store` is populated with data after inference.
+
+Setting `MESSAGES_SMOKE_ONLY=true` runs **only** the Messages API check against `MESSAGES_SMOKE_MODEL` and assumes the container is already running (it does not start one). This mode is used by the `messages-openai.yml` and `messages-vllm.yml` workflows.
 
 Models tested depend on available credentials:
 
@@ -27,7 +31,7 @@ Models tested depend on available credentials:
 |-------|---------------------|---------------|
 | vLLM inference model (`vllm-inference/Qwen/Qwen3-0.6B`) | `VLLM_INFERENCE_MODEL` | Yes |
 | Embedding model (`vllm-embedding/ibm-granite/granite-embedding-125m-english`) | `EMBEDDING_MODEL` | Yes (list only) |
-| Vertex AI model (`vertexai/publishers/google/models/gemini-2.0-flash`) | `VERTEX_AI_PROJECT` | Only if set |
+| Vertex AI model (`vertexai/publishers/google/models/gemini-2.5-flash`) | `VERTEX_AI_PROJECT` | Only if set |
 | OpenAI model (`openai/gpt-5-nano`) | `OPENAI_API_KEY` | Only if set |
 
 #### Running locally
@@ -53,7 +57,7 @@ export OPENAI_API_KEY="<key>"
 
 Integration tests run the upstream [ogx pytest suite](https://github.com/ogx/ogx) against the distribution's running server. The script:
 
-1. **Extracts the ogx version** from the generated `distribution/Containerfile` to ensure tests match the bundled version.
+1. **Extracts the ogx version** from `build/build.env` to ensure tests match the bundled version.
 2. **Clones the ogx repository** at the matching version tag into `/tmp/ogx-integration-tests`.
 3. **Runs `pytest`** against `tests/integration/inference/` with required test dependencies installed, pointing at `distribution/config.yaml`.
    - `ogx-client` is required.
@@ -102,6 +106,33 @@ Prerequisites:
 ./tests/run_integration_tests.sh
 ```
 
+### Claude Agent SDK Session (`messages_agent_sdk.py`)
+
+Drives a basic 3-turn conversation through the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python), which talks to the server's Anthropic-compatible Messages API (`/v1/messages`). This proves the shipped image can serve a real Agent SDK session, not just a single request. Each turn references the previous one, so a broken session (no conversational continuity) surfaces as a failure rather than a silent pass.
+
+Configuration (environment variables):
+
+| Variable | Purpose |
+|----------|---------|
+| `ANTHROPIC_BASE_URL` | OGX server base URL (default `http://127.0.0.1:8321`) |
+| `ANTHROPIC_API_KEY` | Sent to OGX but not validated for local providers (default `fake`) |
+| `MESSAGES_AGENT_MODEL` | OGX model id passed through as the Anthropic `model` (e.g. `openai/gpt-4.1-nano`) |
+
+#### Running locally
+
+Prerequisites: Python 3.10+, Node.js, the Claude Code CLI, and the Agent SDK.
+
+```bash
+npm install -g @anthropic-ai/claude-code
+uv venv && source .venv/bin/activate
+uv pip install claude-agent-sdk anyio
+
+export ANTHROPIC_BASE_URL="http://127.0.0.1:8321"
+export ANTHROPIC_API_KEY="fake"
+export MESSAGES_AGENT_MODEL="openai/gpt-4.1-nano"
+python tests/messages_agent_sdk.py
+```
+
 ## CI/CD Pipelines
 
 Testing is automated via GitHub Actions workflows in `.github/workflows/`.
@@ -110,9 +141,9 @@ Testing is automated via GitHub Actions workflows in `.github/workflows/`.
 
 The main CI pipeline that builds, tests, and publishes the container image. It runs on:
 
-- **Pull requests** to `main`, `rhoai-v*`, and `konflux-poc*` branches (when `distribution/`, `tests/`, or workflow files change)
-- **Pushes** to `main` and `rhoai-v*` branches
-- **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits.
+- **Pull requests** to `main`, `rhoai-v*`, `release-*`, and `konflux-poc*` branches (when `distribution/`, `Containerfile`, `tests/`, or workflow files change)
+- **Pushes** to `main`, `rhoai-v*`, and `release-*` branches
+- **Manual dispatch** (`workflow_dispatch`) to build from an arbitrary ogx commit. Intentionally skips all tests to allow building images for specific SHAs even when CI is failing on other commits
 - **Nightly schedule** (6 AM UTC) to test the `main` branch of ogx
 
 Pipeline steps:
@@ -123,10 +154,35 @@ Pipeline steps:
 4. **Start PostgreSQL** via the `setup-postgres` action
 5. **Run smoke tests** (`tests/smoke.sh`)
 6. **Run integration tests** (`tests/run_integration_tests.sh`)
-7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main` or `rhoai-v*` branches when `distribution/` changed, or on manual dispatch)
+7. **Publish** multi-arch image to `quay.io/opendatahub/odh-ogx-core` (on push to `main`, `rhoai-v*`, or `release-*` branches when `distribution/` or `Containerfile` changed, or on manual dispatch)
 8. **Notify Slack** on failure or successful publish
 
 Logs from all containers (ogx, vLLM, PostgreSQL) and system info are uploaded as artifacts with 7-day retention.
+
+> [!NOTE]
+> The basic Messages API check (`/v1/messages`) runs as part of `smoke.sh`, so it is exercised on every PR via this pipeline against the locally-built vLLM model.
+
+### Messages API + Claude Agent SDK (`messages-openai.yml`, `messages-vllm.yml`)
+
+Per-provider workflows that pull the published image, boot it with the Messages API enabled, then run two distinct paths as separate steps so a failure clearly identifies which one broke:
+
+1. **Messages API basic** - `smoke.sh` in `MESSAGES_SMOKE_ONLY` mode sends a single-turn `/v1/messages` request and asserts the response shape.
+2. **Claude Agent SDK session** - `messages_agent_sdk.py` runs a 3-turn Agent SDK conversation against `/v1/messages`.
+
+| Workflow | Inference backend | Path exercised |
+|----------|-------------------|----------------|
+| `messages-openai.yml` | OpenAI (`OPENAI_API_KEY`) | Anthropic ⇄ OpenAI translation |
+| `messages-vllm.yml` | Local vLLM container (`vllm-cpu`, no creds) | Native `/v1/messages` passthrough |
+
+**Why not MaaS?** The RHOAI MaaS endpoint sits behind a 3scale (apicast) gateway that only proxies `/v1/chat/completions` and returns `403 "No Mapping Rule matched"` for `/v1/messages`. Native passthrough therefore can't succeed through it, so passthrough is tested against a directly-reachable local vLLM (`messages-vllm.yml`) rather than MaaS. For the same reason, the per-PR `smoke.sh` skips the Messages basic check when `USING_MAAS=true`.
+
+The basic request step is **blocking** on both workflows. The Agent SDK session is **blocking** on `messages-openai.yml` and **non-blocking** (`continue-on-error`) on `messages-vllm.yml`, because the local vLLM model (`Qwen3.5-0.8B`) is small and may not reliably drive a full 3-turn session. The OpenAI model is resolved as `inputs.models` → `vars.TEST_MODELS_OPENAI` → a hardcoded fallback; the vLLM model defaults to the served `vllm-inference/Qwen/Qwen3.5-0.8B`.
+
+`messages-openai.yml` skips automatically when `OPENAI_API_KEY` is not configured (e.g. fork PRs); `messages-vllm.yml` needs no credentials and always runs. Both are `workflow_call` + `workflow_dispatch`.
+
+### Messages Weekly (`messages-weekly.yml`)
+
+A dedicated weekly orchestrator (Sundays 23:00 UTC) that runs the per-provider messages workflows above. Kept separate from `responses-weekly.yml` because these are different APIs with different harnesses; the messages tests do not emit JUnit, so there is no shared report job to combine. Supports `workflow_dispatch` with per-provider toggles.
 
 ### Pre-commit (`pre-commit.yml`)
 
@@ -136,8 +192,10 @@ Runs on all pull requests and pushes to `main`. Executes the full pre-commit hoo
 - **Shellcheck** - Shell script linting
 - **Actionlint** - GitHub Actions workflow linting
 - **Standard hooks** - merge conflict detection, trailing whitespace, large file checks, YAML/JSON/TOML validation, executable shebangs, private key detection, mixed line endings
-- **Distribution Build** (`distribution/build.py`) - Regenerates `distribution/Containerfile`
-- **Distribution Documentation** (`scripts/gen_distro_docs.py`) - Regenerates `distribution/README.md`
+- **Generate config.yaml** (`build/gen_config.py`) - Strips dependency-only providers from `build.yaml`
+- **Generate Containerfile** (`build/gen_containerfile.py`) - Generates `Containerfile` from `Containerfile.in`
+- **Verify _FILE secret sync** (`build/verify_secrets.py`) - Checks secret env vars match `entrypoint.sh`
+- **Distribution Documentation** (`build/gen_distro_docs.py`) - Regenerates `distribution/README.md`
 
 ### Semantic PR Titles (`semantic-pr.yml`)
 
@@ -148,7 +206,7 @@ Validates that pull request titles follow [Conventional Commits](https://www.con
 Triggered via `repository_dispatch` (type: `update-ogx-version`) from the opendatahub-io/ogx midstream repo when a new release is tagged. The workflow:
 
 1. **Validates** the tag format (`vX.Y.Z[.W]+rhaiv.N`) and runs preflight checks (version not already set, branch doesn't exist)
-2. **Updates** `CURRENT_LLAMA_STACK_VERSION` in `distribution/build.py`
+2. **Updates** `OGX_VERSION` in `build/build.env`
 3. **Runs pre-commit** to regenerate distribution artifacts (Containerfile, README)
 4. **Opens a pull request** against `main` with the version bump
 5. **Notifies Slack** with the PR link for review
@@ -157,7 +215,7 @@ Triggered via `repository_dispatch` (type: `update-ogx-version`) from the openda
 
 Builds, tests, and publishes pre-built vLLM CPU container images to `quay.io/opendatahub/vllm-cpu`. These images bundle inference and embedding models so the main CI pipeline doesn't need to download them each run. It runs on:
 
-- **Pull requests** to `main`/`rhoai-v*`/`konflux-poc*` branches and **pushes** to `main`/`rhoai-v*` branches (when `vllm/Containerfile` or actions change)
+- **Pull requests** to `main`/`rhoai-v*`/`release-*`/`konflux-poc*` branches and **pushes** to `main`/`rhoai-v*`/`release-*` branches (when `vllm/Containerfile` or actions change)
 - **Manual dispatch** with optional custom inference/embedding model parameters
 
 ### Test PR in Showroom (`test-pr-in-showroom.yml`)

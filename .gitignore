@@ -3,7 +3,6 @@ __pycache__
 dist
 *.egg-info
 dev_requirements.txt
-build
 .DS_Store
 ogx/configs/*
 .cursor/
@@ -24,4 +23,8 @@ venv/
 pytest-report.xml
 .coverage
 .python-version
-CLAUDE.md
+node_modules/
+tests/functional/reports/
+tests/functional/uv.lock
+tests/functional/bruno/package-lock.json
+tests/functional/bruno/pnpm-lock.yaml

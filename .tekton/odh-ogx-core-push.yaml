@@ -26,9 +26,11 @@ spec:
   - name: output-image
     value: quay.io/opendatahub/odh-ogx-core:odh-stable
   - name: dockerfile
-    value: distribution/Containerfile
+    value: Containerfile
   - name: path-context
     value: .
+  - name: enable-early-gate-testing
+    value: "false"
   pipelineRef:
     resolver: git
     params:

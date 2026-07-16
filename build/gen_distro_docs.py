@@ -1,7 +1,11 @@
-#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["pyyaml>=6,<7"]
+# ///
+
+import re
 
 import yaml
-import re
 from pathlib import Path
 
 
@@ -9,61 +13,48 @@ REPO_ROOT = Path(__file__).parent.parent
 
 
 def extract_ogx_version():
-    """Extract OGX version and repo owner from the Containerfile.
+    """Extract OGX version from build.env.
 
     Returns:
-        tuple: (version, repo_owner) where repo_owner defaults to 'opendatahub-io'
+        tuple: (version, repo_owner) where repo_owner is extracted from
+               OGX_GIT_REPO in gen_lockfile.py or defaults to 'opendatahub-io'
     """
-    containerfile_path = REPO_ROOT / "distribution" / "Containerfile"
+    versions_path = REPO_ROOT / "build" / "build.env"
 
-    if not containerfile_path.exists():
-        print(f"Error: {containerfile_path} not found")
+    if not versions_path.exists():
+        print(f"Error: {versions_path} not found")
         exit(1)
 
-    try:
-        with open(containerfile_path, "r") as file:
-            content = file.read()
+    env = {}
+    with open(versions_path, "r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                env[key.strip()] = value.strip()
 
-        # Check for "main" version in git URL format
-        main_pattern = r"git\+https://github\.com/([^/]+)/ogx\.git@main"
-        main_match = re.search(main_pattern, content)
-        if main_match:
-            repo_owner = main_match.group(1)
-            return ("main", repo_owner)
-
-        # Look for ogx version in pip install commands
-        # Pattern matches: ogx==X.Y.Z or ogx==X.Y.ZrcN+rhaiM
-        pattern = r"ogx==([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:rc[0-9]+)?(?:\+rhaiv\.[0-9]+)?)"
-        match = re.search(pattern, content)
-
-        if match:
-            return (match.group(1), "opendatahub-io")
-
-        # Look for git URL format: git+https://github.com/*/ogx.git@vVERSION or @VERSION
-        git_pattern = r"git\+https://github\.com/([^/]+)/ogx\.git@v?([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:rc[0-9]+)?(?:\+rhaiv\.[0-9]+)?)"
-        git_match = re.search(git_pattern, content)
-
-        if git_match:
-            return (git_match.group(2), git_match.group(1))
-
-        print("Error: Could not find ogx version in Containerfile")
+    version = env.get("OGX_VERSION")
+    if not version:
+        print("Error: OGX_VERSION not found in build.env")
         exit(1)
 
-    except Exception as e:
-        print(f"Error reading Containerfile: {e}")
-        exit(1)
+    # Strip leading 'v' prefix for display
+    if version.startswith("v"):
+        version = version[1:]
+
+    return (version, "opendatahub-io")
 
 
 def load_external_providers_info():
     """Load build.yaml and extract external provider information."""
-    config_path = REPO_ROOT / "distribution" / "build.yaml"
+    config_path = REPO_ROOT / "build" / "build.yaml"
 
     if not config_path.exists():
         print(f"Error: {config_path} not found")
         exit(1)
 
     try:
-        with open(config_path, "r") as file:
+        with open(config_path, "r", encoding="utf-8") as file:
             config_data = yaml.safe_load(file)
 
         providers = config_data.get("providers", {})
@@ -104,7 +95,7 @@ def load_runtime_provider_types():
         print(f"Error: {config_path} not found")
         exit(1)
 
-    with open(config_path, "r") as file:
+    with open(config_path, "r", encoding="utf-8") as file:
         config_data = yaml.safe_load(file)
 
     runtime_types = set()
@@ -195,8 +186,59 @@ def gen_distro_table(providers_data, runtime_provider_types=None):
     return "\n".join(table_lines)
 
 
+def extract_file_secret_vars():
+    """Extract the secret env var names from entrypoint.sh's _FILE resolution loop."""
+    entrypoint = REPO_ROOT / "distribution" / "entrypoint.sh"
+    text = entrypoint.read_text(encoding="utf-8")
+    match = re.search(r"for _secret_var in\s*\\(.*?);\s*do", text, re.DOTALL)
+    if not match:
+        return []
+    body = match.group(1).replace("\\", " ")
+    return sorted(v for v in body.split() if v)
+
+
+def gen_file_secrets_section(secret_vars):
+    """Generate a markdown section documenting _FILE secret support."""
+    if not secret_vars:
+        return ""
+
+    var_list = "\n".join(f"- `{var}` → `{var}_FILE`" for var in secret_vars)
+
+    return f"""
+## Mounting Secrets as Files
+
+Instead of passing secrets directly as environment variables (which exposes them in
+`/proc/1/environ` and subprocess environments), you can mount them as files and
+point to them with `_FILE`-suffixed variables. At container startup, the entrypoint
+reads each file and populates the corresponding environment variable.
+
+For example, to inject `OPENAI_API_KEY` from a mounted Kubernetes Secret:
+
+```yaml
+env:
+  - name: OPENAI_API_KEY_FILE
+    value: /run/secrets/openai-api-key
+volumeMounts:
+  - name: openai-secret
+    mountPath: /run/secrets/openai-api-key
+    subPath: api-key
+    readOnly: true
+volumes:
+  - name: openai-secret
+    secret:
+      secretName: openai-credentials
+```
+
+Setting both the base variable and its `_FILE` variant is an error (mutually exclusive).
+
+### Supported variables
+
+{var_list}
+"""
+
+
 def gen_distro_docs():
-    build_path = REPO_ROOT / "distribution" / "build.yaml"
+    build_path = REPO_ROOT / "build" / "build.yaml"
     readme_path = REPO_ROOT / "distribution" / "README.md"
 
     if not build_path.exists():
@@ -225,7 +267,7 @@ def gen_distro_docs():
         version_display = version
 
     # header section
-    header = f"""<!-- This file is automatically generated by scripts/gen_distro_docs.py from build.yaml and config.yaml - do not update manually -->
+    header = f"""<!-- This file is automatically generated by build/gen_distro_docs.py from build.yaml and config.yaml - do not update manually -->
 
 # Open Data Hub OGX Distribution Image
 
@@ -238,7 +280,7 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 """
 
     try:
-        with open(build_path, "r") as file:
+        with open(build_path, "r", encoding="utf-8") as file:
             build_data = yaml.safe_load(file)
 
         providers = build_data.get("providers", {})
@@ -259,8 +301,13 @@ You can see an overview of the APIs and Providers the image ships with in the ta
             "definitions.\n"
         )
 
-        with open(readme_path, "w") as readme_file:
-            readme_file.write(header + table_content + "\n" + dep_only_note)
+        secret_vars = extract_file_secret_vars()
+        file_secrets_section = gen_file_secrets_section(secret_vars)
+
+        with open(readme_path, "w", encoding="utf-8") as readme_file:
+            readme_file.write(
+                header + table_content + "\n" + dep_only_note + file_secrets_section
+            )
 
         print(f"Successfully generated {readme_path}")
         print(

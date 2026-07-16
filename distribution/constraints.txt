@@ -1,0 +1,7 @@
+# Pip constraints for dependency version overrides.
+# Use this file only for constraints that must apply across both midstream and downstream.
+
+# <3.0 requires pkg_resources, dropped in setuptools 81+
+milvus-lite>=3.0.0
+# 2.6.10 crashes Milvus Lite gRPC init with empty dns:/// target
+pymilvus!=2.6.10

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rhoai-v*
+      - release-*
       - konflux-poc*
     types:
       - opened
@@ -17,6 +18,7 @@ on:
     branches:
       - main
       - rhoai-v*
+      - release-*
     paths:
       - 'vllm/Containerfile'
       - '.github/actions/**'
@@ -24,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       inference_model:
-        description: 'Inference model to preload onto vLLM image - default is Qwen/Qwen3-0.6B'
+        description: 'Inference model to preload onto vLLM image - default is Qwen/Qwen3.5-0.8B'
         type: string
       embedding_model:
         description: 'Embedding model to preload onto vLLM image - default is ibm-granite/granite-embedding-125m-english'
@@ -46,14 +48,14 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     env:
-      INFERENCE_MODEL: ${{ github.event.inputs.inference_model || 'Qwen/Qwen3-0.6B' }}
+      INFERENCE_MODEL: ${{ github.event.inputs.inference_model || 'Qwen/Qwen3.5-0.8B' }}
       EMBEDDING_MODEL: ${{ github.event.inputs.embedding_model || 'ibm-granite/granite-embedding-125m-english' }}
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set image tag components
         run: |
@@ -61,14 +63,14 @@ jobs:
           echo "EMBEDDING_TAG=${EMBEDDING_MODEL#*/}" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
 
       - name: Build image
         id: build
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: vllm/Containerfile
@@ -138,7 +140,7 @@ jobs:
       # Push image by digest for the publish job to assemble into a multi-arch manifest
       - name: Log in to Quay.io
         if: contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
@@ -147,7 +149,7 @@ jobs:
       - name: Push image by digest
         if: contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
         id: push-digest
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: vllm/Containerfile
@@ -178,7 +180,7 @@ jobs:
     if: contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name)
     runs-on: ubuntu-latest
     env:
-      INFERENCE_MODEL: ${{ github.event.inputs.inference_model || 'Qwen/Qwen3-0.6B' }}
+      INFERENCE_MODEL: ${{ github.event.inputs.inference_model || 'Qwen/Qwen3.5-0.8B' }}
       EMBEDDING_MODEL: ${{ github.event.inputs.embedding_model || 'ibm-granite/granite-embedding-125m-english' }}
     permissions:
       contents: read
@@ -197,14 +199,14 @@ jobs:
           merge-multiple: true
 
       - name: Log in to Quay.io
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Create multi-arch manifest and push
         working-directory: /tmp/digests

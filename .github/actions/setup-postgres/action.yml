@@ -1,24 +1,40 @@
 name: Setup PostgreSQL
 description: Start PostgreSQL for ogx
+
+inputs:
+  postgres_user:
+    description: 'PostgreSQL user'
+    default: 'ogx'
+  postgres_password:
+    description: 'PostgreSQL password'
+    default: 'ogx'
+  postgres_db:
+    description: 'PostgreSQL database name'
+    default: 'ogx'
+
 runs:
   using: "composite"
   steps:
     - name: Start PostgreSQL
       shell: bash
+      env:
+        PG_USER: ${{ inputs.postgres_user }}
+        PG_PASSWORD: ${{ inputs.postgres_password }}
+        PG_DB: ${{ inputs.postgres_db }}
       run: |
         docker run -d \
           --name postgres \
           --net=host \
-          -e POSTGRES_USER=ogx \
-          -e POSTGRES_PASSWORD=ogx \
-          -e POSTGRES_DB=ogx \
+          -e "POSTGRES_USER=${PG_USER}" \
+          -e "POSTGRES_PASSWORD=${PG_PASSWORD}" \
+          -e "POSTGRES_DB=${PG_DB}" \
           pgvector/pgvector:pg17
 
         # Wait for PostgreSQL to be ready
         echo "Waiting for PostgreSQL to be ready..."
         postgres_ready=false
         for i in {1..30}; do
-          if docker exec postgres pg_isready -U ogx -d ogx; then
+          if docker exec postgres pg_isready -U "${PG_USER}" -d "${PG_DB}"; then
             echo "PostgreSQL is ready!"
             postgres_ready=true
             break
@@ -31,3 +47,15 @@ runs:
           docker logs postgres || true
           exit 1
         fi
+
+        # Enable pgvector extension (image ships the .so, but the DB needs CREATE EXTENSION).
+        # pg_isready returns true before the database is fully initialized, so retry.
+        echo "Enabling pgvector extension..."
+        for i in {1..10}; do
+          if docker exec postgres psql -U "${PG_USER}" -d "${PG_DB}" -c "CREATE EXTENSION IF NOT EXISTS vector;" 2>/dev/null; then
+            echo "pgvector extension enabled"
+            break
+          fi
+          echo "Attempt $i: database not ready for CREATE EXTENSION, retrying..."
+          sleep 1
+        done

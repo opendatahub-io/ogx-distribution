@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rhoai-v*
+      - release-*
       - konflux-poc*
     types:
       - opened
@@ -12,12 +13,16 @@ on:
     paths:
       - '.github/actions/**'
       - '.github/workflows/redhat-distro-container.yml'
+      - 'build/**'
+      - 'Containerfile'
+      - 'Containerfile.in'
       - 'distribution/**'
       - 'tests/**'
   push:
     branches:
       - main
       - rhoai-v*
+      - release-*
 
   # build a custom image from an arbitrary ogx commit
   # NOTE: workflow_dispatch intentionally skips all tests (vllm setup, postgres setup, smoke tests, integration tests)
@@ -62,11 +67,13 @@ jobs:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # Model names - set defaults, overridden by MaaS configuration step
-      VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3-0.6B
-      VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.0-flash
+      VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
+      VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
+      ANTHROPIC_INFERENCE_MODEL: anthropic/claude-sonnet-4-6
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
@@ -77,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 2  # Need parent commit to detect changes
 
@@ -87,55 +94,51 @@ jobs:
         run: |
           # Check if any file in the distribution directory was modified in this push
           # Use git diff instead of parsing event payload (which is unreliable for merge commits)
-          if git diff --name-only HEAD^ HEAD | grep -q '^distribution/'; then
+          if git diff --name-only HEAD^ HEAD | grep -qE '^(distribution/|Containerfile$)'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was modified in this push, will publish"
+            echo "distribution/ or Containerfile was modified in this push, will publish"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "distribution/ was not modified in this push, skipping publish"
+            echo "distribution/ and Containerfile were not modified in this push, skipping publish"
           fi
 
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
       - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           python-version: 3.12
           enable-cache: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
-      - name: Generate Containerfile to build an image from an arbitrary ogx commit (workflow_dispatch/schedule)
+      - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch/schedule)
         if: contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
-        env:
-          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: |
-          tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/ogx.git "$tmp_build_dir"
-          cd "$tmp_build_dir"
-          git checkout "$OGX_VERSION"
-          python3 -m venv .venv
-          source .venv/bin/activate
-          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
-          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
-          pip install --no-cache -e .
-          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
-          # now remove the install line from the Containerfile
-          cd -
-          python3 distribution/build.py
-          sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
+        uses: ./.github/actions/regenerate-artifacts
+        with:
+          ogx-version: ${{ env.OGX_COMMIT_SHA }}
 
       - name: Build image for testing (${{ matrix.arch }})
         id: build
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: ${{ matrix.platform }}
           push: false
           tags: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
           load: true
           cache-from: type=gha,scope=build-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
+
+      - name: Verify OCI config labels
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_NAME }}:${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
+        run: |
+          ./tests/verify-config-label.sh "$IMAGE_TAG"
 
       - name: Validate provider credentials
         env:
@@ -145,7 +148,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
               echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
-              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; } >> "$GITHUB_ENV"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; } >> "$GITHUB_ENV"
               exit 0
             fi
           fi
@@ -179,6 +182,20 @@ jobs:
           if [ -z "$VERTEX_AI_PROJECT" ] || [ -z "$GCP_WORKLOAD_IDENTITY_PROVIDER" ]; then
             echo "::warning::Vertex AI credentials not configured, skipping Vertex AI tests"
             { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; } >> "$GITHUB_ENV"
+          fi
+
+          # Anthropic: validate key with a lightweight call
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              -H "x-api-key: $ANTHROPIC_API_KEY" \
+              -H "anthropic-version: 2023-06-01" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"claude-sonnet-4-6","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' \
+              https://api.anthropic.com/v1/messages)
+            if [ "$status" != "200" ]; then
+              echo "::warning::Anthropic API returned HTTP $status, skipping Anthropic tests"
+              echo "ANTHROPIC_API_KEY=" >> "$GITHUB_ENV"
+            fi
           fi
 
           # MaaS vLLM: presence check
@@ -222,7 +239,7 @@ jobs:
         id: vllm-inference
         uses: ./.github/actions/setup-vllm
         env:
-          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english
+          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
           VLLM_MODE: inference
 
       - name: Setup vLLM embedding container
@@ -230,7 +247,7 @@ jobs:
         id: vllm-embedding
         uses: ./.github/actions/setup-vllm
         env:
-          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english
+          VLLM_IMAGE: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english
           VLLM_MODE: embedding
 
       - name: Setup PostgreSQL container
@@ -242,6 +259,8 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         id: smoke-test
         shell: bash
+        env:
+          IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
         run: ./tests/smoke.sh
 
       - name: Integration tests
@@ -282,6 +301,13 @@ jobs:
               cp "$file" "logs/$(basename "$file")" || true
             done
           fi
+
+          # Scrub secret values from log files before upload (CWE-532)
+          ./tests/scrub_secrets.sh 'logs/*.log' \
+            VLLM_API_TOKEN VLLM_EMBEDDING_API_TOKEN \
+            OPENAI_API_KEY GEMINI_API_KEY ANTHROPIC_API_KEY \
+            POSTGRES_PASSWORD PGVECTOR_PASSWORD \
+            GOOGLE_APPLICATION_CREDENTIALS
 
       - name: Upload logs as artifacts
         if: always()
@@ -353,55 +379,51 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install uv
         if: github.event_name == 'workflow_dispatch'
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           python-version: 3.12
 
-      - name: Generate Containerfile to build an image from an arbitrary ogx commit (workflow_dispatch)
+      - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
-        env:
-          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: |
-          tmp_build_dir=$(mktemp -d)
-          git clone --filter=blob:none --no-checkout https://github.com/opendatahub-io/ogx.git "$tmp_build_dir"
-          cd "$tmp_build_dir"
-          git checkout "$OGX_VERSION"
-          python3 -m venv .venv
-          source .venv/bin/activate
-          # Extract base version from pyproject.toml (e.g., 0.8.0+rhaiv.0 -> 0.8.0) to pin ogx-api
-          OGX_BASE_VERSION=$(python3 -c "import tomllib; t=tomllib.load(open('pyproject.toml','rb')); print(t.get('project',{}).get('version', t.get('tool',{}).get('setuptools_scm',{}).get('fallback_version','')).split('+')[0])")
-          pip install --no-cache -e .
-          pip install --no-cache "ogx-api==${OGX_BASE_VERSION}" ruamel.yaml
-          # now remove the install line from the Containerfile
-          cd -
-          python3 distribution/build.py
-          sed -i '/^RUN.*pip install.*ogx==/d' distribution/Containerfile
+        uses: ./.github/actions/regenerate-artifacts
+        with:
+          ogx-version: ${{ env.OGX_COMMIT_SHA }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to Quay.io
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
+      - name: Compute branch-specific image tag
+        if: github.event_name == 'push'
+        run: |
+          if [[ "$GITHUB_REF" == refs/heads/rhoai-v* ]]; then
+            echo "BRANCH_TAG=${GITHUB_REF_NAME}-latest" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/heads/release-* ]]; then
+            version="${GITHUB_REF_NAME#release-}"
+            echo "BRANCH_TAG=rhoai-v${version}-latest" >> "$GITHUB_ENV"
+          fi
+
       - name: Publish multi-arch image to Quay.io
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: distribution/Containerfile
+          file: Containerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (startsWith(github.ref, 'refs/heads/rhoai-v') && format(',{0}:{1}-latest', env.IMAGE_NAME, github.ref_name)) || '') }}
+          tags: ${{ github.event_name == 'workflow_dispatch' && format('{0}:source-{1}-{2}', env.IMAGE_NAME, env.OGX_COMMIT_SHA, github.sha) || format('{0}:{1}{2}', env.IMAGE_NAME, github.sha, github.ref == 'refs/heads/main' && format(',{0}:latest', env.IMAGE_NAME) || (env.BRANCH_TAG != '' && format(',{0}:{1}', env.IMAGE_NAME, env.BRANCH_TAG)) || '') }}
           cache-from: |
             type=gha,scope=build-amd64
             type=gha,scope=build-arm64
