@@ -19,14 +19,16 @@ on:
         type: string
 
 jobs:
-  build-and-test:
+  # Unprivileged job: verify PR author trust, checkout, and build the image.
+  # No secrets are available here — fork code cannot access credentials.
+  verify-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    concurrency:
-      group: openshift-cluster-1
-      cancel-in-progress: false
+    timeout-minutes: 15
     permissions:
       contents: read
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.build.outputs.tag }}
 
     steps:
       - name: Get PR information
@@ -49,6 +51,15 @@ jobs:
               pull_number: prNumber
             });
 
+            const trusted = ['MEMBER', 'OWNER', 'COLLABORATOR'];
+            if (!trusted.includes(pr.data.author_association)) {
+              core.setFailed(
+                `Refusing to build PR from untrusted author (association: ${pr.data.author_association}). ` +
+                `Only PRs from ${trusted.join('/')} authors are allowed.`
+              );
+              return;
+            }
+
             core.setOutput('sha', pr.data.head.sha);
             core.setOutput('ref', pr.data.head.ref);
             core.setOutput('repo', pr.data.head.repo.full_name);
@@ -57,6 +68,7 @@ jobs:
             console.log(`  SHA: ${pr.data.head.sha}`);
             console.log(`  Ref: ${pr.data.head.ref}`);
             console.log(`  Repo: ${pr.data.head.repo.full_name}`);
+            console.log(`  Author association: ${pr.data.author_association}`);
 
       - name: Checkout PR code
         if: inputs.pr_number != ''
@@ -107,12 +119,50 @@ jobs:
           uv run build/verify_secrets.py
           podman build -f Containerfile -t "ogx-test:$TAG" .
 
+      - name: Save image as artifact
+        env:
+          IMAGE_TAG: ${{ steps.build.outputs.tag }}
+        run: |
+          podman save -o ogx-test-image.tar "ogx-test:${IMAGE_TAG}"
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ogx-test-image
+          path: ogx-test-image.tar
+          retention-days: 1
+
+  # Privileged job: deploy the pre-built image and run tests.
+  # This job has access to secrets but never executes fork code.
+  deploy-and-test:
+    needs: verify-and-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: openshift-cluster-1
+      cancel-in-progress: false
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: ogx-test-image
+
+      - name: Load image
+        env:
+          IMAGE_TAG: ${{ needs.verify-and-build.outputs.tag }}
+        run: |
+          podman load -i ogx-test-image.tar
+          podman images "ogx-test:${IMAGE_TAG}"
+
       - name: Setup CI environment
         id: setup
         uses: derekhiggins/llama-stack-showroom@f32973c9b7389b14d1988b55abfe74dd98c2432f  # main as of 2026-06-05
         with:
           catalog_image: ${{ inputs.catalog_image }}
-          llama_stack_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
+          llama_stack_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ needs.verify-and-build.outputs.tag }}"
           operator_image: ${{ inputs.operator_image }}
           oc_server: ${{ secrets.OC_SERVER }}
           oc_token: ${{ secrets.OC_TOKEN }}
@@ -126,16 +176,15 @@ jobs:
 
       - name: Push image to OpenShift registry
         id: push
+        env:
+          IMAGE_TAG: ${{ needs.verify-and-build.outputs.tag }}
         run: |
-          # Push image to registry
           "${{ steps.setup.outputs.scripts_dir }}/push-image-to-registry.sh" \
-            ogx-test:${{ steps.build.outputs.tag }} \
+            "ogx-test:${IMAGE_TAG}" \
             redhat-ods-operator \
-            ogx-test:${{ steps.build.outputs.tag }}
+            "ogx-test:${IMAGE_TAG}"
 
-          # Construct pull URL for cluster-internal access
-          PULL_IMAGE="image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ steps.build.outputs.tag }}"
-
+          PULL_IMAGE="image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${IMAGE_TAG}"
           echo "pull_image=${PULL_IMAGE}" >> "$GITHUB_OUTPUT"
 
       - name: Run setup.sh
@@ -181,9 +230,7 @@ jobs:
         if: always()
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
-          PR_SHA: ${{ steps.pr-info.outputs.sha }}
-          PUSH_SHA: ${{ github.sha }}
-          IMAGE_TAG: ${{ steps.build.outputs.tag }}
+          IMAGE_TAG: ${{ needs.verify-and-build.outputs.tag }}
           JOB_STATUS: ${{ job.status }}
         run: |
           {
@@ -192,10 +239,8 @@ jobs:
             echo "## Build Information"
             if [ -n "$PR_NUMBER" ]; then
               echo "- **PR Number**: #${PR_NUMBER}"
-              echo "- **Commit SHA**: ${PR_SHA}"
             else
-              echo "- **Trigger**: push"
-              echo "- **Commit SHA**: ${PUSH_SHA}"
+              echo "- **Trigger**: push/schedule"
             fi
             echo "- **Image Tag**: \`${IMAGE_TAG}\`"
             echo ""
