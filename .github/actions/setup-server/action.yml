@@ -7,7 +7,12 @@ inputs:
     required: true
   image_tag:
     description: 'Container image tag'
-    required: true
+    required: false
+    default: ''
+  image_digest:
+    description: 'Container image digest; overrides image_tag'
+    required: false
+    default: ''
   extra_env:
     description: 'Extra env vars for docker run (one KEY=VALUE per line)'
     required: false
@@ -34,13 +39,26 @@ runs:
       env:
         IMAGE_NAME: ${{ inputs.image_name }}
         IMAGE_TAG: ${{ inputs.image_tag }}
+        IMAGE_DIGEST: ${{ inputs.image_digest }}
         INPUT_EXTRA_ENV: ${{ inputs.extra_env }}
         INPUT_VOLUMES: ${{ inputs.volumes }}
         PG_USER: ${{ inputs.postgres_user }}
         PG_PASSWORD: ${{ inputs.postgres_password }}
         PG_DB: ${{ inputs.postgres_db }}
       run: |
-        docker pull "$IMAGE_NAME:$IMAGE_TAG"
+        if [[ -n "$IMAGE_DIGEST" ]]; then
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::image_digest must be a sha256 digest"
+            exit 1
+          fi
+          image_ref="$IMAGE_NAME@$IMAGE_DIGEST"
+        elif [[ -n "$IMAGE_TAG" ]]; then
+          image_ref="$IMAGE_NAME:$IMAGE_TAG"
+        else
+          echo "::error::image_tag or image_digest is required"
+          exit 1
+        fi
+        docker pull "$image_ref"
 
         docker_args=(
           -d --net=host --name ogx
@@ -76,7 +94,7 @@ runs:
           docker_args+=(--volume "$line")
         done <<< "$INPUT_VOLUMES"
 
-        docker_args+=("$IMAGE_NAME:$IMAGE_TAG")
+        docker_args+=("$image_ref")
 
         docker run "${docker_args[@]}"
 
