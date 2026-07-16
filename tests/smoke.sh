@@ -175,7 +175,7 @@ function test_postgres_tables_exist {
 
   # Retry for up to 10 seconds for tables to be created
   for i in {1..10}; do
-    tables=$(docker exec postgres psql -U ogx -d ogx -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';" 2>/dev/null | tr -d ' ' | tr '\n' ' ')
+    tables=$(docker exec postgres psql -U "${POSTGRES_USER:-ogx}" -d "${POSTGRES_DB:-ogx}" -t -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public';" 2>/dev/null | tr -d ' ' | tr '\n' ' ')
     all_found=true
     for table in "${expected_tables[@]}"; do
       if ! echo "$tables" | grep -q "$table"; then
@@ -195,7 +195,7 @@ function test_postgres_tables_exist {
   echo "===> PostgreSQL tables not created after 10s :("
   echo "Expected tables: ${expected_tables[*]}"
   echo "Available tables: $tables"
-  docker exec postgres psql -U ogx -d ogx -c "\dt" || true
+  docker exec postgres psql -U "${POSTGRES_USER:-ogx}" -d "${POSTGRES_DB:-ogx}" -c "\dt" || true
   return 1
 }
 
@@ -205,7 +205,7 @@ function test_postgres_populated {
   # Check that chat_completions table has data (retry for up to 10 seconds)
   echo "Waiting for inference_store table to be populated..."
   for i in {1..10}; do
-    inference_count=$(docker exec postgres psql -U ogx -d ogx -t -c "SELECT COUNT(*) FROM inference_store;" 2>/dev/null | tr -d ' ')
+    inference_count=$(docker exec postgres psql -U "${POSTGRES_USER:-ogx}" -d "${POSTGRES_DB:-ogx}" -t -c "SELECT COUNT(*) FROM inference_store;" 2>/dev/null | tr -d ' ')
     if [ -n "$inference_count" ] && [ "$inference_count" -gt 0 ]; then
       echo "===> inference_store table has $inference_count record(s)"
       break
@@ -216,9 +216,9 @@ function test_postgres_populated {
   if [ -z "$inference_count" ] || [ "$inference_count" -eq 0 ]; then
     echo "===> PostgreSQL inference_store table is empty or doesn't exist after 10s :("
     echo "Tables in database:"
-    docker exec postgres psql -U ogx -d ogx -c "\dt" || true
+    docker exec postgres psql -U "${POSTGRES_USER:-ogx}" -d "${POSTGRES_DB:-ogx}" -c "\dt" || true
     echo "inference_store table contents:"
-    docker exec postgres psql -U ogx -d ogx -t -c "SELECT COUNT(*) FROM inference_store;" || true
+    docker exec postgres psql -U "${POSTGRES_USER:-ogx}" -d "${POSTGRES_DB:-ogx}" -t -c "SELECT COUNT(*) FROM inference_store;" || true
     return 1
   fi
 
