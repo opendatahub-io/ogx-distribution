@@ -116,13 +116,9 @@ jobs:
 
       - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch/schedule)
         if: contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name)
-        env:
-          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: |
-          uv run build/gen_config.py
-          uv run build/gen_lockfile.py
-          uv run build/gen_containerfile.py
-          uv run build/verify_secrets.py
+        uses: ./.github/actions/regenerate-artifacts
+        with:
+          ogx-version: ${{ env.OGX_COMMIT_SHA }}
 
       - name: Build image for testing (${{ matrix.arch }})
         id: build
@@ -393,13 +389,9 @@ jobs:
 
       - name: Regenerate distribution artifacts from an arbitrary ogx commit (workflow_dispatch)
         if: github.event_name == 'workflow_dispatch'
-        env:
-          OGX_VERSION: ${{ env.OGX_COMMIT_SHA }}
-        run: |
-          uv run build/gen_config.py
-          uv run build/gen_lockfile.py
-          uv run build/gen_containerfile.py
-          uv run build/verify_secrets.py
+        uses: ./.github/actions/regenerate-artifacts
+        with:
+          ogx-version: ${{ env.OGX_COMMIT_SHA }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0

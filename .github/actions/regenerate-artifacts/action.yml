@@ -1,0 +1,28 @@
+name: Regenerate distribution artifacts
+description: Run the build scripts that regenerate config, lockfiles, Containerfile, and verify secrets
+
+inputs:
+  ogx-version:
+    description: 'OGX version to set (overrides OGX_VERSION from build.env)'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Working directory for running build scripts'
+    required: false
+    default: '.'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Regenerate distribution artifacts
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        OGX_VERSION_OVERRIDE: ${{ inputs.ogx-version }}
+      run: |
+        if [ -n "$OGX_VERSION_OVERRIDE" ]; then
+          export OGX_VERSION="$OGX_VERSION_OVERRIDE"
+        fi
+        uv run build/gen_config.py
+        uv run build/gen_lockfile.py
+        uv run build/gen_containerfile.py

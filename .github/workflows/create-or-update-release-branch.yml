@@ -84,24 +84,18 @@ jobs:
           fi
           echo "Updated OGX_VERSION to ${TAG}"
 
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: |
-            **/requirements*.txt
-            .pre-commit-config.yaml
+          python-version: 3.12
+          enable-cache: false
 
-      # Two-pass approach: the first run lets hooks autofix files (e.g., regenerating
-      # distribution/ artifacts). The second run verifies everything is clean.
-      - name: Run pre-commit (auto-fix pass)
-        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-        continue-on-error: true
-        env:
-          SKIP: no-commit-to-branch
+      - name: Regenerate distribution artifacts
+        uses: ./.github/actions/regenerate-artifacts
+        with:
+          ogx-version: ${{ env.TAG }}
 
-      - name: Run pre-commit (verification pass)
+      - name: Run pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         env:
           SKIP: no-commit-to-branch
@@ -127,6 +121,7 @@ jobs:
         id: commit
         run: |
           git add build/build.env Containerfile \
+            distribution/config.yaml \
             distribution/requirements-lock.txt distribution/requirements-lock-konflux.txt \
             distribution/README.md
           if git diff --cached --quiet; then
