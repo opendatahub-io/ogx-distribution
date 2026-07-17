@@ -24,14 +24,8 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           persist-credentials: false
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-        with:
-          python-version: 3.12
-          enable-cache: false
-
       - name: Regenerate lockfiles
-        run: uv run build/gen_lockfile.py
+        run: ./build/run_gen_lockfile.sh
 
       - name: Check for changes
         id: changes
