@@ -145,5 +145,30 @@
         "error": 206
       }
     ]
+  },
+  {
+    "date": "2026-07-19 22:18 UTC",
+    "run_number": "40",
+    "run_id": "29705840346",
+    "run_url": "https://github.com/opendatahub-io/ogx-distribution/actions/runs/29705840346",
+    "ogx_version": "v1.2.1+rhaiv.0",
+    "branch": "main",
+    "commit": "b7e74f7e",
+    "totals": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "error": 0
+    },
+    "models": [
+      {
+        "provider": "bedrock",
+        "model": "openai.gpt-oss-20b-1-0",
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "error": 0
+      }
+    ]
   }
 ]
