@@ -29,6 +29,18 @@ on:
         description: 'vLLM MaaS models (comma-separated, leave empty for defaults)'
         type: string
         default: ''
+      run_bedrock:
+        description: 'Run Bedrock tests'
+        type: boolean
+        default: true
+      bedrock_models:
+        description: 'Bedrock models (comma-separated, leave empty for defaults)'
+        type: string
+        default: ''
+      bedrock_region:
+        description: 'Bedrock AWS region (leave empty for repo/default)'
+        type: string
+        default: ''
 
 permissions:
   id-token: write
@@ -61,12 +73,23 @@ jobs:
       models: ${{ inputs.vllm_maas_models }}
     secrets: inherit
 
+  # ── Bedrock ────────────────────────────────────────────────────
+  test-bedrock:
+    if: github.event_name == 'schedule' || inputs.run_bedrock != false
+    uses: ./.github/workflows/responses-bedrock.yml
+    with:
+      models: ${{ inputs.bedrock_models }}
+      aws_region: ${{ inputs.bedrock_region }}
+    secrets:
+      AWS_BEDROCK_ROLE_ARN: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+      TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
+
   # ── Test Report & GitHub Pages ───────────────────────────────────
   report:
     name: Publish Test Report
     runs-on: ubuntu-24.04
     if: ${{ !cancelled() }}
-    needs: [test-openai, test-vertexai, test-vllm-maas]
+    needs: [test-openai, test-vertexai, test-vllm-maas, test-bedrock]
 
     steps:
       - name: Checkout repository
