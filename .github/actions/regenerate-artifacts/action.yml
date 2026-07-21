@@ -24,5 +24,5 @@ runs:
           export OGX_VERSION="$OGX_VERSION_OVERRIDE"
         fi
         uv run build/gen_config.py
-        uv run build/gen_lockfile.py
+        ./build/run_gen_lockfile.sh
         uv run build/gen_containerfile.py
