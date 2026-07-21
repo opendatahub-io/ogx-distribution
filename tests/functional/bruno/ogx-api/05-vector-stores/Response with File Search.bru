@@ -1,0 +1,57 @@
+meta {
+  name: Response with File Search
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/v1/responses
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "model": "{{model}}",
+    "input": "What does the test upload file contain?",
+    "tools": [
+      {
+        "type": "file_search",
+        "vector_store_ids": ["{{vector_store_id}}"]
+      }
+    ],
+    "temperature": 0
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response completed with output", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("status");
+    expect(body.status).to.eql("completed");
+    expect(body).to.have.property("output");
+    expect(body.output).to.be.an("array");
+    expect(body.output.length).to.be.greaterThan(0);
+  });
+  test("file_search tool was invoked", function() {
+    const output = res.getBody().output;
+    const call = output.find(item => item.type === "file_search_call");
+    expect(call).to.not.be.undefined;
+    expect(call.status).to.eql("completed");
+  });
+  test("file_search results contain uploaded file", function() {
+    const output = res.getBody().output;
+    const call = output.find(item => item.type === "file_search_call");
+    expect(call).to.have.property("results");
+    expect(call.results).to.be.an("array");
+    expect(call.results.length).to.be.greaterThan(0);
+    call.results.forEach(r => {
+      expect(r).to.have.property("file_id");
+      expect(r).to.have.property("text");
+      expect(r.text).to.be.a("string").and.not.empty;
+    });
+  });
+}

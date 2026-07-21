@@ -1,0 +1,47 @@
+meta {
+  name: Create Embedding
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/embeddings
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "model": "{{embedding_model}}",
+    "input": "OGX functional test embedding",
+    "encoding_format": "float"
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has data array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("data");
+    expect(body.data).to.be.an("array");
+    expect(body.data.length).to.be.greaterThan(0);
+  });
+  test("First embedding has correct structure", function() {
+    const item = res.getBody().data[0];
+    expect(item).to.have.property("embedding");
+    expect(item.embedding).to.be.an("array");
+    expect(item.embedding.length).to.be.greaterThan(0);
+  });
+  test("Embedding dimension matches configured value", function() {
+    const item = res.getBody().data[0];
+    const expectedDim = Number(bru.getEnvVar("embedding_dimension"));
+    expect(item.embedding.length).to.eql(expectedDim);
+  });
+  test("Response model matches configured embedding model", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("model");
+    expect(body.model).to.eql(bru.getEnvVar("embedding_model"));
+  });
+}

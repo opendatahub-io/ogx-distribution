@@ -1,0 +1,46 @@
+meta {
+  name: Create Text Completion
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/completions
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "model": "{{model}}",
+    "prompt": "The capital of France is",
+    "max_tokens": 32,
+    "temperature": 0
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has choices array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("choices");
+    expect(body.choices).to.be.an("array");
+    expect(body.choices.length).to.be.greaterThan(0);
+  });
+  test("First choice has text content", function() {
+    const body = res.getBody();
+    expect(body.choices[0]).to.have.property("text");
+    expect(body.choices[0].text).to.be.a("string");
+  });
+  test("Response model matches configured model", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("model");
+    expect(body.model).to.eql(bru.getEnvVar("model"));
+  });
+  test("Response contains expected keyword", function() {
+    const text = res.getBody().choices[0].text.toLowerCase();
+    expect(text).to.include("paris");
+  });
+}

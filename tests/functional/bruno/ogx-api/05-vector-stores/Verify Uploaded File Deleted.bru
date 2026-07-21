@@ -1,0 +1,17 @@
+meta {
+  name: Verify Uploaded File Deleted
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/v1/files/{{vs_file_id}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Deleted file returns 404", function() {
+    expect(res.getStatus()).to.eql(404);
+  });
+}
