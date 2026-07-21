@@ -5,12 +5,13 @@ description = "Functional tests for OGX (Bruno + notebooks)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "ogx-client~=1.0.0",
+    "ogx-client~=1.1.0",
     "openai>=2.24.0",
     "pytest>=9.0.2",
     "nbformat>=5.10.4",
     "nbconvert>=7.17.0",
     "ipykernel>=7.2.0",
+    "mcp>=1.9.0",
 ]
 
 [build-system]
