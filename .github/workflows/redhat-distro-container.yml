@@ -142,7 +142,7 @@ jobs:
 
       - name: Validate provider credentials
         env:
-          _MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
+          _MAAS_VLLM_URL: ${{ vars.LITEMAAS_URL }}
         run: |
           # Fork/Dependabot PRs: secrets are unavailable
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -205,10 +205,12 @@ jobs:
 
       - name: Configure MaaS vLLM endpoints
         env:
-          _MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
-          _MAAS_VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
-          _MAAS_EMBEDDING_URL: ${{ secrets.MAAS_EMBEDDING_URL }}
-          _MAAS_EMBEDDING_API_TOKEN: ${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+          _MAAS_VLLM_URL: ${{ vars.LITEMAAS_URL }}
+          _MAAS_VLLM_API_TOKEN: ${{ secrets.LITEMAAS_API_KEY }}
+          _MAAS_EMBEDDING_URL: ${{ vars.LITEMAAS_URL }}
+          _MAAS_EMBEDDING_API_TOKEN: ${{ secrets.LITEMAAS_API_KEY }}
+          _MAAS_INFERENCE_MODEL: ${{ vars.LITEMAAS_INFERENCE_MODEL }}
+          _MAAS_EMBEDDING_MODEL: ${{ vars.LITEMAAS_EMBEDDING_MODEL }}
         run: |
           if [ -z "$_MAAS_VLLM_URL" ]; then
             echo "MaaS vLLM URL not configured, skipping"
@@ -218,12 +220,12 @@ jobs:
           {
             echo "VLLM_URL=$_MAAS_VLLM_URL"
             echo "VLLM_API_TOKEN=$_MAAS_VLLM_API_TOKEN"
-            echo "VLLM_INFERENCE_MODEL=vllm-inference/llama-3-2-3b"
+            echo "VLLM_INFERENCE_MODEL=vllm-inference/$_MAAS_INFERENCE_MODEL"
             echo "VLLM_EMBEDDING_URL=$_MAAS_EMBEDDING_URL"
             echo "VLLM_EMBEDDING_API_TOKEN=$_MAAS_EMBEDDING_API_TOKEN"
-            echo "EMBEDDING_MODEL=vllm-embedding/nomic-embed-text-v1-5"
+            echo "EMBEDDING_MODEL=vllm-embedding/$_MAAS_EMBEDDING_MODEL"
             echo "EMBEDDING_PROVIDER=vllm-embedding"
-            echo "EMBEDDING_PROVIDER_MODEL_ID=nomic-embed-text-v1-5"
+            echo "EMBEDDING_PROVIDER_MODEL_ID=$_MAAS_EMBEDDING_MODEL"
             echo "USING_MAAS=true"
           } >> "$GITHUB_ENV"
 
