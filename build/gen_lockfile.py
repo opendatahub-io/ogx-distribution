@@ -194,12 +194,12 @@ def _get_opentelemetry_packages(bootstrap_bin: Path) -> list[str]:
     packages = []
     for line in result.stdout.splitlines():
         line = line.strip()
+        # Exclude packages not available in the RHAI index
         if line and not any(
             pkg in line
             for pkg in (
-                "opentelemetry-instrumentation-botocore",
                 "opentelemetry-instrumentation-exceptions",
-                "opentelemetry-instrumentation-system-metrics",
+                "opentelemetry-instrumentation-structlog",
             )
         ):
             packages.append(line)
