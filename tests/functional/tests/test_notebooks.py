@@ -11,7 +11,6 @@ from nbconvert.preprocessors import ExecutePreprocessor
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOK_DIR = REPO_ROOT / "notebooks"
-# Notebooks to skip (e.g. long-running, demo-only, or replaced by split test notebooks)
 SKIP_NOTEBOOKS = []
 TIMEOUT = 600  # seconds per notebook
 
@@ -24,6 +23,14 @@ def _collect_notebooks():
     ]
 
 
+_SKIP_GUARD = nbformat.v4.new_code_cell(
+    source=(
+        'assert not globals().get("_skip_reason"), '
+        'f"Notebook silently skipped: {_skip_reason}"'
+    )
+)
+
+
 @pytest.mark.parametrize("notebook", _collect_notebooks(), ids=lambda p: p.name)
 def test_notebook_execution(notebook: Path):
     """Run notebook to completion; fail on any unhandled exception."""
@@ -32,5 +39,6 @@ def test_notebook_execution(notebook: Path):
     assert any("assert " in c.source for c in nb.cells if c.cell_type == "code"), (
         f"{notebook.name} has no assert statements"
     )
+    nb.cells.append(_SKIP_GUARD)
     ep = ExecutePreprocessor(timeout=TIMEOUT)
     ep.preprocess(nb)
