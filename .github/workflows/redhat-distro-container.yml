@@ -68,18 +68,20 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AWS_BEDROCK_ROLE_ARN: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
       # Model names - set defaults, overridden by MaaS configuration step
       VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
       VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
       ANTHROPIC_INFERENCE_MODEL: anthropic/claude-sonnet-4-6
+      BEDROCK_INFERENCE_MODEL: bedrock/openai.gpt-oss-20b-1:0
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
       OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
     permissions:
-      id-token: write # for Google Cloud authentication
+      id-token: write # for Google Cloud and AWS OIDC authentication
       contents: read
 
     steps:
@@ -148,7 +150,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
               echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
-              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; } >> "$GITHUB_ENV"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; echo "AWS_BEDROCK_ROLE_ARN="; } >> "$GITHUB_ENV"
               exit 0
             fi
           fi
@@ -198,6 +200,12 @@ jobs:
             fi
           fi
 
+          # Bedrock: presence check (auth validated by aws-actions/configure-aws-credentials step)
+          if [ -z "$AWS_BEDROCK_ROLE_ARN" ]; then
+            echo "::warning::AWS_BEDROCK_ROLE_ARN not configured, skipping Bedrock tests"
+            echo "AWS_BEDROCK_ROLE_ARN=" >> "$GITHUB_ENV"
+          fi
+
           # MaaS vLLM: presence check
           if [ -z "$_MAAS_VLLM_URL" ]; then
             echo "::warning::MaaS vLLM URL not configured, will use local vLLM"
@@ -233,6 +241,13 @@ jobs:
         with:
           project_id: ${{ env.VERTEX_AI_PROJECT }}
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Authenticate to AWS (Bedrock)
+        if: matrix.arch == 'amd64' && env.AWS_BEDROCK_ROLE_ARN != '' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_BEDROCK_REGION || 'us-east-2' }}
 
       - name: Setup vLLM inference container
         if: github.event_name != 'workflow_dispatch' && env.USING_MAAS != 'true'
@@ -307,7 +322,8 @@ jobs:
             VLLM_API_TOKEN VLLM_EMBEDDING_API_TOKEN \
             OPENAI_API_KEY GEMINI_API_KEY ANTHROPIC_API_KEY \
             POSTGRES_PASSWORD PGVECTOR_PASSWORD \
-            GOOGLE_APPLICATION_CREDENTIALS
+            GOOGLE_APPLICATION_CREDENTIALS \
+            AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 
       - name: Upload logs as artifacts
         if: always()
