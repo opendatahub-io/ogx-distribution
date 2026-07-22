@@ -61,10 +61,13 @@ jobs:
           oc_token: ${{ secrets.OC_TOKEN }}
           env: |
             SHOWROOM_PULL_SECRET=${{ secrets.SHOWROOM_PULL_SECRET }}
-            SHOWROOM_VLLM_URL=https://llama-3-2-3b-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
-            SHOWROOM_VLLM_API_TOKEN=${{ secrets.SHOWROOM_VLLM_API_TOKEN }}
-            SHOWROOM_VLLM_EMBEDDING_URL=https://nomic-embed-text-v1-5-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
-            SHOWROOM_VLLM_EMBEDDING_API_TOKEN=${{ secrets.SHOWROOM_VLLM_EMBEDDING_API_TOKEN }}
+            SHOWROOM_VLLM_URL=${{ vars.LITEMAAS_URL }}
+            SHOWROOM_VLLM_API_TOKEN=${{ secrets.LITEMAAS_API_KEY }}
+            SHOWROOM_INFERENCE_MODEL=${{ vars.LITEMAAS_INFERENCE_MODEL }}
+            SHOWROOM_VLLM_EMBEDDING_URL=${{ vars.LITEMAAS_URL }}
+            SHOWROOM_VLLM_EMBEDDING_API_TOKEN=${{ secrets.LITEMAAS_API_KEY }}
+            SHOWROOM_EMBEDDING_MODEL=${{ vars.LITEMAAS_EMBEDDING_MODEL }}
+            SHOWROOM_EMBEDDING_PROVIDER_MODEL_ID=${{ vars.LITEMAAS_EMBEDDING_MODEL }}
             SHOWROOM_OPENAI_API_KEY=${{ secrets.SHOWROOM_OPENAI_API_KEY }}
 
       - name: Push image to OpenShift registry

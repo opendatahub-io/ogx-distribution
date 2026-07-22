@@ -22,7 +22,7 @@ on:
 
 env:
   PROVIDER_NAME: vllm-maas
-  EMBEDDING_MODEL: vllm-embedding/Nomic-embed-text-v2-moe
+  EMBEDDING_MODEL: vllm-embedding/${{ vars.LITEMAAS_EMBEDDING_MODEL }}
   IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
   IMAGE_TAG: ${{ inputs.image_tag || 'source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c' }}
 
@@ -36,8 +36,8 @@ jobs:
       - name: Check MaaS credentials
         id: check
         env:
-          MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
-          MAAS_VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
+          MAAS_VLLM_URL: ${{ vars.LITEMAAS_URL }}
+          MAAS_VLLM_API_TOKEN: ${{ secrets.LITEMAAS_API_KEY }}
         run: |
           if [ -z "$MAAS_VLLM_URL" ] || [ -z "$MAAS_VLLM_API_TOKEN" ]; then
             echo "::warning::MaaS vLLM credentials not configured, skipping tests"
@@ -87,14 +87,14 @@ jobs:
           image_name: ${{ env.IMAGE_NAME }}
           image_tag: ${{ env.IMAGE_TAG }}
           extra_env: |
-            VLLM_URL=${{ secrets.MAAS_VLLM_URL }}
-            VLLM_API_TOKEN=${{ secrets.MAAS_VLLM_API_TOKEN }}
-            VLLM_EMBEDDING_URL=${{ secrets.MAAS_EMBEDDING_URL }}
-            VLLM_EMBEDDING_API_TOKEN=${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+            VLLM_URL=${{ vars.LITEMAAS_URL }}
+            VLLM_API_TOKEN=${{ secrets.LITEMAAS_API_KEY }}
+            VLLM_EMBEDDING_URL=${{ vars.LITEMAAS_URL }}
+            VLLM_EMBEDDING_API_TOKEN=${{ secrets.LITEMAAS_API_KEY }}
             TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
-            EMBEDDING_MODEL=vllm-embedding/Nomic-embed-text-v2-moe
+            EMBEDDING_MODEL=${{ env.EMBEDDING_MODEL }}
             EMBEDDING_PROVIDER=vllm-embedding
-            EMBEDDING_PROVIDER_MODEL_ID=Nomic-embed-text-v2-moe
+            EMBEDDING_PROVIDER_MODEL_ID=${{ vars.LITEMAAS_EMBEDDING_MODEL }}
 
       - name: Clone upstream tests
         shell: bash
@@ -149,8 +149,8 @@ jobs:
       - name: Scrub secrets from test results
         if: ${{ !cancelled() }}
         env:
-          VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
-          VLLM_EMBEDDING_API_TOKEN: ${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+          VLLM_API_TOKEN: ${{ secrets.LITEMAAS_API_KEY }}
+          VLLM_EMBEDDING_API_TOKEN: ${{ secrets.LITEMAAS_API_KEY }}
           TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
         run: |
           ./tests/scrub_secrets.sh '/tmp/test-results/*' \
