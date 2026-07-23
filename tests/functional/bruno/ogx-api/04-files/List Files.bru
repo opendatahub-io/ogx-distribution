@@ -1,0 +1,22 @@
+meta {
+  name: List Files
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/files
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has data array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("data");
+    expect(body.data).to.be.an("array");
+  });
+}
