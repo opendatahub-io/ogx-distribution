@@ -377,6 +377,7 @@ jobs:
       OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
     permissions:
       contents: read
+      id-token: write # for cosign keyless signing
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -406,6 +407,9 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
       - name: Compute branch-specific image tag
         if: github.event_name == 'push'
         run: |
@@ -417,6 +421,7 @@ jobs:
           fi
 
       - name: Publish multi-arch image to Quay.io
+        id: push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -427,6 +432,9 @@ jobs:
           cache-from: |
             type=gha,scope=build-amd64
             type=gha,scope=build-arm64
+
+      - name: Sign container image with cosign
+        run: cosign sign --yes "${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
 
       - name: Set Slack notify status
         if: failure()
