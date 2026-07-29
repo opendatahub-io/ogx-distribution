@@ -36,6 +36,11 @@ PINNED_DEPENDENCIES = [
     "'setuptools==81.0.0'",  # due to bug in milvus-lite with unreleased fix: https://github.com/milvus-io/milvus-lite/pull/323
     "'pillow>=12.3.0'",  # CVE-2026-42311, CVE-2026-55379/55380/54060
     "'nltk>=3.10.0'",  # CVE-2026-54293, CVE-2026-12243
+    "'langchain<1.0.0,>=0.3.0'",  # ragas requires langchain 0.3.x
+    "'langchain-community<0.4,>=0.3.0'",
+    "'langchain-core<1.0.0,>=0.3.85'",
+    "'langchain-openai<1.0.0,>=0.3.0'",
+    "'langchain-text-splitters<1.0.0,>=0.3.0'",
 ]
 
 source_install_command_pypi_client = """RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/llama-stack.git@{llama_stack_version}
