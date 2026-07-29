@@ -1,28 +1,32 @@
-name: Setup VLLM
-description: Start VLLM
+name: Setup vLLM
+description: Start vLLM
 runs:
   using: "composite"
   steps:
-    - name: Start VLLM
+    - name: Start vLLM container
       shell: bash
       run: |
+        # Set VLLM_ARGS based on VLLM_MODE
+        if [[ "$VLLM_MODE" == "inference" ]]; then
+          VLLM_ARGS="--host 0.0.0.0 --port 8000 --enable-auto-tool-choice --tool-call-parser hermes --model /opt/vllm/models/Qwen/Qwen3.5-0.8B --served-model-name Qwen/Qwen3.5-0.8B --max-model-len 8192"
+          VLLM_PORT=8000
+        elif [[ "$VLLM_MODE" == "embedding" ]]; then
+          VLLM_ARGS="--host 0.0.0.0 --port 8001 --model /opt/vllm/models/ibm-granite/granite-embedding-125m-english --served-model-name ibm-granite/granite-embedding-125m-english"
+          VLLM_PORT=8001
+        else
+          echo "Error: VLLM_MODE must be set to 'inference' or 'embedding'"
+          exit 1
+        fi
+
         # Start vllm container
         docker run -d \
-          --name vllm \
-          --privileged=true \
+          --name vllm-$VLLM_MODE \
           --net=host \
-          quay.io/higginsd/vllm-cpu:65393ee064-qwen3 \
-          --host 0.0.0.0 \
-          --port 8000 \
-          --enable-auto-tool-choice \
-          --tool-call-parser hermes \
-          --model /root/.cache/Qwen3-0.6B \
-          --served-model-name Qwen/Qwen3-0.6B \
-          --max-model-len 8192
+          $VLLM_IMAGE \
+          $VLLM_ARGS
 
-          # Wait for vllm to be ready
-          echo "Waiting for vllm to be ready..."
-          timeout 900 bash -c 'until curl -fsS http://localhost:8000/health >/dev/null; do
-            echo "Waiting for vllm..."
-            sleep 5
-          done'
+        echo "Waiting for vllm to be ready on port $VLLM_PORT..."
+        timeout 900 bash -c "until curl -fsS http://localhost:$VLLM_PORT/health >/dev/null; do
+          echo 'Waiting for vllm...'
+          sleep 5
+        done"
