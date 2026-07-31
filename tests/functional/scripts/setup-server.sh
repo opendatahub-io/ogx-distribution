@@ -11,7 +11,7 @@
 #
 # Options:
 #   --start-only     Start PostgreSQL + OGX, then exit
-#   --tests-only     Run tests against existing OGX server (uses BASE_URL or localhost:8321)
+#   --tests-only     Run tests against existing OGX server (uses BASE_URL or 0.0.0.0:8321)
 #   --cleanup        Remove containers and exit
 #   --no-cleanup     In full mode, keep containers after tests
 #   --its            ITS mode: use podman pod (shared localhost) with vLLM inference
@@ -31,11 +31,11 @@
 # INFERENCE_MODEL       Inference model (default: auto-discovered from server)
 #
 # ITS mode env vars (defaults match pr-its-pipeline.yaml):
-#   VLLM_IMAGE          vLLM image (default: quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english)
-#   VLLM_INFERENCE_MODEL       Inference model name (default: Qwen/Qwen3-0.6B)
-#   VLLM_INFERENCE_MODEL_PATH  Model path in container (default: /root/.cache/Qwen/Qwen3-0.6B)
+#   VLLM_IMAGE                 vLLM image (default: quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english)
+#   VLLM_INFERENCE_MODEL       Inference model name (default: Qwen/Qwen3.5-0.8B)
+#   VLLM_INFERENCE_MODEL_PATH  Model path in container (default: /opt/vllm/models/Qwen/Qwen3.5-0.8B)
 #   VLLM_EMBEDDING_MODEL       Embedding model name (default: ibm-granite/granite-embedding-125m-english)
-#   VLLM_EMBEDDING_MODEL_PATH  Model path in container (default: /root/.cache/ibm-granite/granite-embedding-125m-english)
+#   VLLM_EMBEDDING_MODEL_PATH  Model path in container (default: /opt/vllm/models/ibm-granite/granite-embedding-125m-english)
 #
 # Provider env vars (forwarded to OGX container if set):
 #   VLLM_URL, VLLM_API_TOKEN, VLLM_TLS_VERIFY
@@ -48,12 +48,21 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/../../.env"
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  set +a
+fi
+
 # Force SHELL=bash to prevent Bruno's shell-env from spawning fish (hangs on bash -ilc syntax)
 export SHELL=/bin/bash
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-OGX_IMAGE="${OGX_IMAGE:-quay.io/rhoai/odh-ogx-core-rhel9:rhoai-3.5-ea.2}"
+OGX_IMAGE="${OGX_IMAGE:-quay.io/rhoai/odh-ogx-core-rhel9:rhoai-3.5}"
 OGX_PORT="${OGX_PORT:-8321}"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-docker.io/pgvector/pgvector:pg17}"
 POSTGRES_USER="${POSTGRES_USER:-ogx}"
@@ -70,11 +79,11 @@ VOLUME_NAME="postgres-data"
 # ITS mode config (matches pr-its-pipeline.yaml)
 ITS_MODE=false
 POD_NAME="ogx-its-pod"
-VLLM_IMAGE="${VLLM_IMAGE:-quay.io/opendatahub/vllm-cpu:Qwen3-0.6B-granite-embedding-125m-english}"
-VLLM_INFERENCE_MODEL="${VLLM_INFERENCE_MODEL:-Qwen/Qwen3-0.6B}"
-VLLM_INFERENCE_MODEL_PATH="${VLLM_INFERENCE_MODEL_PATH:-/root/.cache/Qwen/Qwen3-0.6B}"
+VLLM_IMAGE="${VLLM_IMAGE:-quay.io/opendatahub/vllm-cpu:Qwen3.5-0.8B-granite-embedding-125m-english}"
+VLLM_INFERENCE_MODEL="${VLLM_INFERENCE_MODEL:-Qwen/Qwen3.5-0.8B}"
+VLLM_INFERENCE_MODEL_PATH="${VLLM_INFERENCE_MODEL_PATH:-/opt/vllm/models/${VLLM_INFERENCE_MODEL}}"
 VLLM_EMBEDDING_MODEL="${VLLM_EMBEDDING_MODEL:-ibm-granite/granite-embedding-125m-english}"
-VLLM_EMBEDDING_MODEL_PATH="${VLLM_EMBEDDING_MODEL_PATH:-/root/.cache/ibm-granite/granite-embedding-125m-english}"
+VLLM_EMBEDDING_MODEL_PATH="${VLLM_EMBEDDING_MODEL_PATH:-/opt/vllm/models/${VLLM_EMBEDDING_MODEL}}"
 
 # Provider env vars forwarded to the OGX container (if set in calling env)
 FORWARD_VARS=(
@@ -189,13 +198,16 @@ start_vllm_inference() {
         --host 0.0.0.0 \
         --port 8000 \
         --enable-auto-tool-choice \
-        --tool-call-parser hermes \
+        --language-model-only \
+        --skip-mm-profiling \
+        --enforce-eager \
+        --tool-call-parser qwen3_xml \
         --model "$VLLM_INFERENCE_MODEL_PATH" \
         --served-model-name "$VLLM_INFERENCE_MODEL" \
         --max-model-len 8192 \
         --gpu-memory-utilization 0.50
 
-    wait_for_http "vLLM inference" "http://localhost:8000/health" 600
+    wait_for_http "vLLM inference" "http://0.0.0.0:8000/health" 600
 }
 
 start_vllm_embedding() {
@@ -211,7 +223,7 @@ start_vllm_embedding() {
         --gpu-memory-utilization 0.05 \
         --hf-overrides '{"is_matryoshka": true}'
 
-    wait_for_http "vLLM embedding" "http://localhost:8001/health" 600
+    wait_for_http "vLLM embedding" "http://0.0.0.0:8001/health" 600
 }
 
 # ── Standard mode functions ──────────────────────────────────────────────────
@@ -286,7 +298,7 @@ start_ogx() {
     local postgres_host RUN_ARGS=()
 
     if [[ "$ITS_MODE" == true ]]; then
-        postgres_host="localhost"
+        postgres_host="0.0.0.0"
         RUN_ARGS=(
             --pod "$POD_NAME"
             --name "${POD_NAME}-ogx"
@@ -301,10 +313,9 @@ start_ogx() {
             -e "PGVECTOR_DB=${POSTGRES_DB}"
             -e "PGVECTOR_USER=${POSTGRES_USER}"
             -e "PGVECTOR_PASSWORD=${POSTGRES_PASSWORD}"
-            -e "VLLM_URL=http://localhost:8000/v1"
-            -e "VLLM_EMBEDDING_URL=http://localhost:8001/v1"
+            -e "VLLM_URL=http://0.0.0.0:8000/v1"
+            -e "VLLM_EMBEDDING_URL=http://0.0.0.0:8001/v1"
             -e "EMBEDDING_MODEL=${VLLM_EMBEDDING_MODEL}"
-            -e "TRUSTYAI_LMEVAL_USE_K8S=False"
         )
     else
         postgres_host="${CONTAINER_NAME_PG}"
@@ -397,7 +408,7 @@ start_ogx() {
 }
 
 wait_for_health() {
-    local health_url="http://localhost:${OGX_PORT}/v1/health"
+    local health_url="http://0.0.0.0:${OGX_PORT}/v1/health"
     local max_attempts=60
     local ogx_container
     if [[ "$ITS_MODE" == true ]]; then
@@ -433,138 +444,45 @@ wait_for_health() {
     exit 1
 }
 
-discover_model() {
-    if [[ -n "${INFERENCE_MODEL:-}" ]]; then
-        echo "Using pre-set INFERENCE_MODEL=${INFERENCE_MODEL}"
-        return 0
-    fi
-
-    local models_url="http://localhost:${OGX_PORT}/v1/models"
-    echo "Discovering inference model from ${models_url}..."
-
-    local response
-    response=$(curl -sS "${models_url}") || {
-        echo -e "${RED}Failed to query /v1/models${NC}" >&2
-        exit 1
-    }
-
-    INFERENCE_MODEL=$(python3 -c "
-import json, sys, os
-data = json.loads(sys.stdin.read())
-prov = os.environ.get('INFERENCE_PROVIDER', '')
-candidates = [m['id'] for m in data.get('data', [])
-              if (m.get('custom_metadata') or {}).get('model_type') != 'embedding']
-if prov:
-    preferred = [c for c in candidates if c.startswith(prov + '/')]
-    print(preferred[0] if preferred else (candidates[0] if candidates else ''))
-else:
-    print(candidates[0] if candidates else '')
-" <<< "$response")
-
-    if [[ -z "$INFERENCE_MODEL" ]]; then
-        echo -e "${RED}No non-embedding model found on the server.${NC}" >&2
-        echo "Response:" >&2
-        python3 -m json.tool <<< "$response" 2>/dev/null || echo "$response" >&2
-        exit 1
-    fi
-
-    export INFERENCE_MODEL
-    echo -e "${GREEN}Discovered model: ${INFERENCE_MODEL}${NC}"
-}
-
-discover_embedding_model() {
-    if [[ -n "${EMBEDDING_MODEL:-}" ]]; then
-        echo "Using pre-set EMBEDDING_MODEL=${EMBEDDING_MODEL}"
-        return 0
-    fi
-
-    local models_url="http://localhost:${OGX_PORT}/v1/models"
-    echo "Discovering embedding model from ${models_url}..."
-
-    local response
-    response=$(curl -sS "${models_url}") || {
-        echo -e "${YELLOW}Failed to query /v1/models for embedding — skipping${NC}" >&2
-        return 0
-    }
-
-    EMBEDDING_MODEL=$(python3 -c "
-import json, sys
-data = json.loads(sys.stdin.read())
-candidates = []
-for m in data.get('data', []):
-    meta = m.get('custom_metadata', {}) or {}
-    if meta.get('model_type') == 'embedding':
-        candidates.append(m['id'])
-# Prefer vllm-embedding provider (remote, always works) over sentence-transformers (local-only)
-for c in candidates:
-    if c.startswith('vllm-embedding/'):
-        print(c); sys.exit(0)
-print(candidates[0] if candidates else '')
-" <<< "$response")
-
-    if [[ -z "$EMBEDDING_MODEL" ]]; then
-        echo -e "${YELLOW}No embedding model found on the server.${NC}"
-        return 0
-    fi
-
-    export EMBEDDING_MODEL
-    echo -e "${GREEN}Discovered embedding model: ${EMBEDDING_MODEL}${NC}"
-}
-
-discover_providers() {
-    local providers_url="http://localhost:${OGX_PORT}/v1/providers"
-    echo "Discovering providers from ${providers_url}..."
-
-    local response
-    response=$(curl -sS "${providers_url}" 2>/dev/null) || {
-        echo -e "${YELLOW}Failed to query /v1/providers — skipping${NC}" >&2
-        return 0
-    }
-
-    while IFS='=' read -r key value; do
-        [[ -z "$key" ]] && continue
-        export "$key=$value"
-    done < <(python3 -c "
-import json, sys, re
-data = json.loads(sys.stdin.read()).get('data', [])
-api_map = {}
-for p in data:
-    api = p.get('api', '')
-    pid = p.get('provider_id', '')
-    if api and pid and api not in api_map and re.fullmatch(r'[a-zA-Z0-9_.:-]+', pid):
-        api_map[api] = pid
-for k in ('inference', 'files', 'vector_io'):
-    if k in api_map:
-        print(f'{k.upper()}_PROVIDER={api_map[k]}')
-" <<< "$response")
-
-    export INFERENCE_PROVIDER="${INFERENCE_PROVIDER:-}"
-    export FILES_PROVIDER="${FILES_PROVIDER:-}"
-    export VECTOR_IO_PROVIDER="${VECTOR_IO_PROVIDER:-}"
-    echo -e "${GREEN}Discovered providers: inference=${INFERENCE_PROVIDER} files=${FILES_PROVIDER} vector_io=${VECTOR_IO_PROVIDER}${NC}"
-}
-
 run_tests() {
-    export BASE_URL="http://localhost:${OGX_PORT}"
-    export INFERENCE_MODEL
-    export EMBEDDING_MODEL="${EMBEDDING_MODEL:-}"
-    export INFERENCE_PROVIDER="${INFERENCE_PROVIDER:-}"
-    export FILES_PROVIDER="${FILES_PROVIDER:-}"
-    export VECTOR_IO_PROVIDER="${VECTOR_IO_PROVIDER:-}"
-    # MCP test server runs on the host; OGX in a container can't reach host's localhost.
-    # Use host.containers.internal (podman's host gateway) for both pod and bridge modes.
-    # In Konflux ITS (real Kubernetes pod), override to http://localhost:${MCP_PORT}.
-    export MCP_SERVER_URL="${MCP_SERVER_URL:-http://host.containers.internal:${MCP_PORT:-8322}}"
+    ## If ITS mode use predefined values
+    if [[ "$ITS_MODE" == true ]]; then
+        export INFERENCE_MODEL="vllm-inference/Qwen/Qwen3.5-0.8B"
+        export EMBEDDING_MODEL="vllm-embedding/ibm-granite/granite-embedding-125m-english"
+        export INFERENCE_PROVIDER="vllm-inference"
+        export FILES_PROVIDER="meta-reference-files"
+        export VECTOR_IO_PROVIDER="pgvector"
+        export EMBEDDING_DIMENSION="768"
+        export MCP_HOST="host.containers.internal"
+        export MCP_HTTP_PORT="8322"
+        export MCP_SSE_PORT="8323"
+    else
+        export INFERENCE_MODEL="${INFERENCE_MODEL:-}"
+        export EMBEDDING_MODEL="${EMBEDDING_MODEL:-}"
+        export INFERENCE_PROVIDER="${INFERENCE_PROVIDER:-}"
+        export FILES_PROVIDER="${FILES_PROVIDER:-}"
+        export VECTOR_IO_PROVIDER="${VECTOR_IO_PROVIDER:-}"
+        export EMBEDDING_DIMENSION="${EMBEDDING_DIMENSION:-}"
+        export MCP_HOST="${MCP_HOST:-}"
+        export MCP_HTTP_PORT="${MCP_HTTP_PORT:-}"
+        export MCP_SSE_PORT="${MCP_SSE_PORT:-}"
+    fi
+
+    export BASE_URL="http://0.0.0.0:${OGX_PORT}"
+
+    # Notebook MCP servers bind on 0.0.0.0 (the host); OGX reaches them via MCP_HOST.
+    # Locally OGX runs in a pod, so MCP_HOST=host.containers.internal (podman host gateway).
+    # In Konflux ITS the tests are co-located with OGX, so MCP_HOST=0.0.0.0.
 
     echo -e "${GREEN}Running functional tests...${NC}"
     echo "  BASE_URL=${BASE_URL}"
     echo "  INFERENCE_MODEL=${INFERENCE_MODEL}"
     echo "  EMBEDDING_MODEL=${EMBEDDING_MODEL}"
-    echo "  MCP_SERVER_URL=${MCP_SERVER_URL}"
+    echo "  MCP_HOST=${MCP_HOST}"
+    echo "  MCP_HTTP_PORT=${MCP_HTTP_PORT}"
+    echo "  MCP_SSE_PORT=${MCP_SSE_PORT}"
 
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    "${script_dir}/run-tests-with-providers.sh"
+    "${SCRIPT_DIR}/run-tests-with-providers.sh"
 }
 
 cleanup() {
@@ -592,13 +510,28 @@ print_status() {
         echo -e "${GREEN}Infrastructure is running.${NC}"
     fi
     echo "========================================"
-    echo "  OGX server:  http://localhost:${OGX_PORT}"
+    ## Fetch version from OGX server
+    local version_url="http://0.0.0.0:${OGX_PORT}/v1/version"
+    local version_response version
+    version_response=$(curl -sS "${version_url}")
+    version=$(echo "${version_response}" | jq -r '.version')
+
+    ## Fetch vL
+    echo "  OGX server:  http://0.0.0.0:${OGX_PORT}  (version: ${version})"
     if [[ "$ITS_MODE" == true ]]; then
-        echo "  vLLM inference:  http://localhost:8000  (${VLLM_INFERENCE_MODEL})"
-        echo "  vLLM embedding:  http://localhost:8001  (${VLLM_EMBEDDING_MODEL})"
+        # Fetch vLLM inference and embedding versions
+        local vllm_inference_url="http://0.0.0.0:8000/version"
+        local vllm_inference_response vllm_inference_version
+        vllm_inference_response=$(curl -sS "${vllm_inference_url}")
+        vllm_inference_version=$(echo "${vllm_inference_response}" | jq -r '.version')
+        local vllm_embedding_url="http://0.0.0.0:8001/version"
+        local vllm_embedding_response vllm_embedding_version
+        vllm_embedding_response=$(curl -sS "${vllm_embedding_url}")
+        vllm_embedding_version=$(echo "${vllm_embedding_response}" | jq -r '.version')
+        echo "  vLLM inference:  http://0.0.0.0:8000  (version: ${vllm_inference_version})"
+        echo "  vLLM embedding:  http://0.0.0.0:8001  (version: ${vllm_embedding_version})"
     fi
-    echo "  PostgreSQL:  localhost:${POSTGRES_PORT}"
-    echo "  INFERENCE_MODEL:       ${INFERENCE_MODEL}"
+    echo "  PostgreSQL:  0.0.0.0:${POSTGRES_PORT}"
     echo "  Image:       ${OGX_IMAGE}"
     echo ""
     echo "Run tests:"
@@ -607,10 +540,7 @@ print_status() {
     else
         echo "  ./scripts/setup-server.sh --tests-only"
     fi
-    echo "  # or manually:"
-    echo "  BASE_URL=http://localhost:${OGX_PORT} INFERENCE_MODEL=${INFERENCE_MODEL} ./scripts/run-tests-with-providers.sh"
-    echo ""
-    echo "Logs:"
+    echo "/nLogs:"
     if [[ "$ITS_MODE" == true ]]; then
         echo "  podman logs -f ${POD_NAME}-ogx"
         echo "  podman logs -f ${POD_NAME}-vllm-inference"
@@ -643,7 +573,7 @@ case "$MODE" in
         ;;
 
     tests-only)
-        export BASE_URL="${BASE_URL:-http://localhost:${OGX_PORT}}"
+        export BASE_URL="${BASE_URL:-http://0.0.0.0:${OGX_PORT}}"
         # Verify server is reachable
         if ! curl -fsS "${BASE_URL}/v1/health" >/dev/null 2>&1; then
             echo -e "${RED}No OGX server at ${BASE_URL}${NC}" >&2
@@ -651,9 +581,7 @@ case "$MODE" in
             exit 1
         fi
         echo -e "${GREEN}Found running OGX at ${BASE_URL}${NC}"
-        discover_providers
-        discover_model
-        discover_embedding_model
+        print_status
         run_tests
         ;;
 
@@ -667,9 +595,6 @@ case "$MODE" in
             start_vllm_embedding
         fi
         start_ogx
-        discover_providers
-        discover_model
-        discover_embedding_model
         print_status
         ;;
 
@@ -686,9 +611,7 @@ case "$MODE" in
             start_vllm_embedding
         fi
         start_ogx
-        discover_providers
-        discover_model
-        discover_embedding_model
+        print_status
         run_tests
         echo -e "${GREEN}All tests passed!${NC}"
         ;;
