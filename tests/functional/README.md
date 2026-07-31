@@ -28,7 +28,6 @@ Reports land in `reports/` as JUnit XML (`bruno-crud.xml`, `notebooks.xml`).
 |--------|---------|
 | `scripts/setup-server.sh` | Start/stop local infra (podman). Use `--its` for full pod, `--start-only` / `--tests-only` / `--cleanup` for individual steps |
 | `scripts/run-tests-with-providers.sh` | Run Bruno CRUD + notebook tests against a running server. Requires `BASE_URL` and `INFERENCE_MODEL` |
-| `scripts/sync-client-version.sh` | Auto-sync `ogx-client` pip package to match the server version |
 | `scripts/bruno_summary.py` | Convert Bruno JSON output to JUnit XML |
 
 ## Environment Variables
@@ -82,4 +81,4 @@ Copy an existing `.bru` file, edit the request and assertions. Tests are auto-di
 
 ### Notebooks (feature scenarios)
 
-Create `notebooks/test_<feature>.ipynb`. Use `ogx-client` for API calls and `assert` for validation. Auto-discovered by `tests/test_notebooks.py` — no registration needed.
+Create `notebooks/test_<feature>.ipynb`. Use the OpenAI client (`from openai import OpenAI`, pointed at OGX's `/v1`) for API calls and `assert` for validation. Auto-discovered by `tests/test_notebooks.py` — no registration needed.

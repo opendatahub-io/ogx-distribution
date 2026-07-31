@@ -66,8 +66,6 @@ _wait_for_server() {
 
 _wait_for_server
 
-source "$(dirname "${BASH_SOURCE[0]}")/sync-client-version.sh"
-
 # Health-check helper: verify the server is reachable, restart port-forward if needed
 _ensure_server() {
   if curl -sf --connect-timeout 3 "${BASE_URL}/v1/health" >/dev/null 2>&1; then
@@ -161,10 +159,6 @@ if [[ -n "${BRU}" && -d "${OGX_CRUD_DIR}" ]]; then
     EXIT_CODE=1
   fi
   rm -f "${_bruno_json}"
-  if [[ $EXIT_CODE -ne 0 ]]; then
-    echo "  CRUD tests failed — skipping notebooks (fail-fast)"
-    exit "$EXIT_CODE"
-  fi
   echo ""
 else
   echo ">>> Phase 1: skipped (Bruno CLI not found)"
