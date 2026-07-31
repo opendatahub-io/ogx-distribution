@@ -306,12 +306,6 @@ def main():
         with _build_venv([*ogx_reqs], target.index_config) as venv:
             dependencies = _get_dependencies(venv / "bin" / "ogx")
 
-        # Temporary: RHAI index doesn't have all markitdown[all] extras deps
-        if name == LockfileType.DOWNSTREAM:
-            dependencies = [
-                re.sub(r"^markitdown\[.*\]", "markitdown", d) for d in dependencies
-            ]
-
         print("  Discovering opentelemetry instrumentation packages...")
         with _build_venv(
             [*ogx_reqs] + dependencies,
