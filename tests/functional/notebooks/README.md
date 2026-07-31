@@ -51,12 +51,17 @@ Notebooks read env vars directly via `os.environ.get`. The test runner script (`
 
    ```python
    import os
-   from ogx_client import OgxClient
+   from openai import OpenAI
    from scripts.helpers import response_text
 
-   base_url = os.environ.get("BASE_URL", "http://localhost:8321")
-   model = os.environ.get("INFERENCE_MODEL", "")
+   base_url = os.environ.get("BASE_URL")
+   model = os.environ.get("INFERENCE_MODEL")
+   assert base_url, "BASE_URL must be set"
    assert model, "INFERENCE_MODEL must be set"
+
+   openai_base_url = base_url.rstrip("/")
+   openai_base_url = openai_base_url if openai_base_url.endswith("/v1") else openai_base_url + "/v1"
+   client = OpenAI(api_key="no-key-needed", base_url=openai_base_url)
    ```
 
 3. Follow this cell structure:

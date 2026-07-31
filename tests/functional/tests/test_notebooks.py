@@ -11,7 +11,6 @@ from nbconvert.preprocessors import ExecutePreprocessor
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOK_DIR = REPO_ROOT / "notebooks"
-# Notebooks to skip (e.g. long-running, demo-only, or replaced by split test notebooks)
 SKIP_NOTEBOOKS = []
 TIMEOUT = 600  # seconds per notebook
 
