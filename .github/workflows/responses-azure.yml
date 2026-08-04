@@ -1,0 +1,198 @@
+name: "Responses: Azure OpenAI"
+
+on:
+  workflow_call:
+    inputs:
+      models:
+        description: 'Comma-separated model IDs to test (leave empty for defaults)'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to test (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+      models:
+        description: 'Comma-separated model IDs to test (default: all)'
+        required: false
+        type: string
+
+env:
+  PROVIDER_NAME: azure
+  EMBEDDING_MODEL: azure/text-embedding-3-small
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
+  IMAGE_TAG: ${{ inputs.image_tag || 'source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+      models_json: ${{ steps.models.outputs.json }}
+    steps:
+      - name: Check Azure credentials
+        id: check
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_OPENAI_RESOURCE_GROUP: ${{ secrets.AZURE_OPENAI_RESOURCE_GROUP }}
+        run: |
+          if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_TENANT_ID" ] || [ -z "$AZURE_SUBSCRIPTION_ID" ] || [ -z "$AZURE_OPENAI_RESOURCE" ] || [ -z "$AZURE_OPENAI_RESOURCE_GROUP" ]; then
+            echo "::warning::Azure credentials not configured, skipping tests"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve models
+        id: models
+        env:
+          INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_AZURE }}
+        run: |
+          default='["azure/gpt-4o-mini"]'
+          if [ -z "$INPUT_MODELS" ]; then
+            echo "json=$default" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=$(printf '%s' "$INPUT_MODELS" | python3 -c 'import sys,json; print(json.dumps([m.strip() for m in sys.stdin.read().split(",") if m.strip()]))')" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: check
+    if: needs.check.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJson(needs.check.outputs.models_json) }}
+    permissions:
+      id-token: write
+      contents: read
+      checks: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: 3.12
+          enable-cache: false
+
+      - name: Authenticate to Azure
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch Azure OpenAI API key
+        id: azkey
+        env:
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_OPENAI_RESOURCE_GROUP: ${{ secrets.AZURE_OPENAI_RESOURCE_GROUP }}
+        run: |
+          key=$(az cognitiveservices account keys list \
+            --name "$AZURE_OPENAI_RESOURCE" \
+            --resource-group "$AZURE_OPENAI_RESOURCE_GROUP" \
+            --query key1 -o tsv)
+          echo "::add-mask::$key"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PostgreSQL
+        uses: ./.github/actions/setup-postgres
+
+      - name: Setup server
+        uses: ./.github/actions/setup-server
+        with:
+          image_name: ${{ env.IMAGE_NAME }}
+          image_tag: ${{ env.IMAGE_TAG }}
+          extra_env: |
+            AZURE_API_KEY=${{ steps.azkey.outputs.key }}
+            AZURE_API_BASE=${{ secrets.AZURE_API_BASE }}
+            AZURE_API_VERSION=${{ secrets.AZURE_API_VERSION }}
+            AZURE_API_TYPE=azure
+            TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
+            EMBEDDING_MODEL=azure/text-embedding-3-small
+            EMBEDDING_PROVIDER=azure
+            EMBEDDING_PROVIDER_MODEL_ID=text-embedding-3-small
+            EMBEDDING_DIMENSION=1536
+
+      - name: Clone upstream tests
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/ogx-ai/ogx.git /tmp/ogx-tests
+          cd /tmp/ogx-tests
+          git fetch --depth 1 origin 9769a91c543e527389707e8a342339528d23c9f5 # v1.0.0
+          git checkout 9769a91c543e527389707e8a342339528d23c9f5
+
+          uv venv --clear
+          source .venv/bin/activate
+          uv pip install -e . ogx-client ollama pytest langchain-openai langgraph
+
+      - name: Derive short model name
+        id: model
+        env:
+          FULL_MODEL: ${{ matrix.model }}
+        run: |
+          echo "short=${FULL_MODEL##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Run responses tests
+        shell: bash
+        env:
+          MODEL: ${{ matrix.model }}
+          SHORT: ${{ steps.model.outputs.short }}
+        run: |
+          cd /tmp/ogx-tests
+          source .venv/bin/activate
+          mkdir -p /tmp/test-results
+
+          SKIP_TESTS="test_response_connector_resolution_mcp_tool"
+
+          python -m pytest -s -v tests/integration/responses/ \
+            -k "not ($SKIP_TESTS)" \
+            --stack-config=server:"$GITHUB_WORKSPACE/distribution/config.yaml" \
+            --text-model="$MODEL" \
+            --embedding-model="$EMBEDDING_MODEL" \
+            --inference-mode=live \
+            --junit-xml="/tmp/test-results/results_${PROVIDER_NAME}_${SHORT}.xml" \
+            || [ $? -eq 5 ]
+
+      - name: Publish test report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "${{ env.PROVIDER_NAME }}/${{ steps.model.outputs.short }}"
+          path: /tmp/test-results/*.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+
+      - name: Scrub secrets from test results
+        if: ${{ !cancelled() }}
+        env:
+          AZURE_API_KEY: ${{ steps.azkey.outputs.key }}
+          TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
+        run: |
+          ./tests/scrub_secrets.sh '/tmp/test-results/*' \
+            AZURE_API_KEY TAVILY_SEARCH_API_KEY
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: responses-${{ env.PROVIDER_NAME }}-${{ steps.model.outputs.short }}
+          path: /tmp/test-results/
+          retention-days: 90
+
+      - name: Cleanup
+        if: ${{ !cancelled() }}
+        run: |
+          for c in ogx postgres; do
+            docker rm -f "$c" 2>/dev/null || true
+          done
