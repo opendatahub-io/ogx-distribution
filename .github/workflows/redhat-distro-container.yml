@@ -40,7 +40,7 @@ concurrency:
 
 env:
   REGISTRY: quay.io
-  IMAGE_NAME: quay.io/opendatahub/llama-stack # tags for the image will be added dynamically
+  IMAGE_NAME: quay.io/opendatahub/odh-ogx-core # tags for the image will be added dynamically
 
 jobs:
   build-test:
