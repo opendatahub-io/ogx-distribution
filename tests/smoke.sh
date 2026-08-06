@@ -77,6 +77,18 @@ function start_and_wait_for_ogx_container {
     docker_args+=(--env "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
   fi
 
+  if [ -n "${AWS_BEDROCK_ROLE_ARN:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+    docker_args+=(
+      --env "ENABLE_BEDROCK=1"
+      --env "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID"
+      --env "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY"
+      --env "AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}"
+      --env "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-2}"
+    )
+    # Models are auto-discovered at startup via the ListFoundationModels
+    # control-plane API (SigV4), so no config patching is needed.
+  fi
+
   docker_args+=(--name ogx "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
 
   # Start ogx
@@ -408,6 +420,14 @@ main() {
       inference_models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
     else
       echo "===> ANTHROPIC_API_KEY is not set, skipping Anthropic models"
+    fi
+
+    if [ -n "${AWS_BEDROCK_ROLE_ARN:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+      echo "===> Bedrock credentials available, including Bedrock models in tests"
+      models_to_test+=("$BEDROCK_INFERENCE_MODEL")
+      inference_models_to_test+=("$BEDROCK_INFERENCE_MODEL")
+    else
+      echo "===> Bedrock credentials not available, skipping Bedrock models"
     fi
 
     echo "===> Testing model list for all models..."
