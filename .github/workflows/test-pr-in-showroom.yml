@@ -159,19 +159,22 @@ jobs:
 
       - name: Setup CI environment
         id: setup
-        uses: derekhiggins/llama-stack-showroom@f32973c9b7389b14d1988b55abfe74dd98c2432f  # main as of 2026-06-05
+        uses: opendatahub-io/ogx-showroom@5cc2fe338d2bbfe12159891bb3f0ab41469e389a  # main as of 2026-07-24 (includes #56 model env vars)
         with:
           catalog_image: ${{ inputs.catalog_image }}
-          llama_stack_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ needs.verify-and-build.outputs.tag }}"
+          ogx_image: "image-registry.openshift-image-registry.svc:5000/redhat-ods-operator/ogx-test:${{ needs.verify-and-build.outputs.tag }}"
           operator_image: ${{ inputs.operator_image }}
           oc_server: ${{ secrets.OC_SERVER }}
           oc_token: ${{ secrets.OC_TOKEN }}
           env: |
             SHOWROOM_PULL_SECRET=${{ secrets.SHOWROOM_PULL_SECRET }}
-            SHOWROOM_VLLM_URL=https://llama-3-2-3b-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
-            SHOWROOM_VLLM_API_TOKEN=${{ secrets.SHOWROOM_VLLM_API_TOKEN }}
-            SHOWROOM_VLLM_EMBEDDING_URL=https://nomic-embed-text-v1-5-maas-apicast-production.apps.prod.rhoai.rh-aiservices-bu.com:443/v1
-            SHOWROOM_VLLM_EMBEDDING_API_TOKEN=${{ secrets.SHOWROOM_VLLM_EMBEDDING_API_TOKEN }}
+            SHOWROOM_VLLM_URL=${{ vars.LITEMAAS_URL }}
+            SHOWROOM_VLLM_API_TOKEN=${{ secrets.LITEMAAS_API_KEY }}
+            SHOWROOM_INFERENCE_MODEL=${{ vars.LITEMAAS_INFERENCE_MODEL }}
+            SHOWROOM_VLLM_EMBEDDING_URL=${{ vars.LITEMAAS_URL }}
+            SHOWROOM_VLLM_EMBEDDING_API_TOKEN=${{ secrets.LITEMAAS_API_KEY }}
+            SHOWROOM_EMBEDDING_MODEL=${{ vars.LITEMAAS_EMBEDDING_MODEL }}
+            SHOWROOM_EMBEDDING_PROVIDER_MODEL_ID=${{ vars.LITEMAAS_EMBEDDING_MODEL }}
             SHOWROOM_OPENAI_API_KEY=${{ secrets.SHOWROOM_OPENAI_API_KEY }}
 
       - name: Push image to OpenShift registry
