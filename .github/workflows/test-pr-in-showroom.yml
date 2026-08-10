@@ -1,6 +1,9 @@
 name: Test PR in Showroom
 
 on:
+  push:
+    branches:
+      - ntsh
   schedule:
     - cron: '0 8 * * *'  # daily at 08:00 UTC
   workflow_dispatch:
@@ -132,6 +135,13 @@ jobs:
           path: ogx-test-image.tar
           retention-days: 1
 
+      - name: Debug - tmate on failure
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+          timeout-minutes: 30
+
   # Privileged job: deploy the pre-built image and run tests.
   # This job has access to secrets but never executes fork code.
   deploy-and-test:
@@ -254,3 +264,10 @@ jobs:
               echo "❌ Tests failed. Check the logs above for details."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Debug - tmate on failure
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+          timeout-minutes: 30
