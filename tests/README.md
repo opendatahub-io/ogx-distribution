@@ -81,6 +81,11 @@ Some upstream tests are currently skipped, grouped by reason:
 - `test_tool_with_complex_schema`
 - `test_tool_without_schema`
 
+**Structured output and tool-calling tests timing out on CPU:**
+- `test_openai_chat_completion_structured_output`
+- `test_simple_tool_call`
+- `test_streaming_tool_calls`
+
 **Requires vLLM >= v0.12.0** ([ogx/ogx#4984](https://github.com/ogx/ogx/issues/4984)):
 - `test_openai_completion_guided_choice`
 
