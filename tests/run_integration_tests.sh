@@ -52,7 +52,7 @@ function run_integration_tests() {
 
     cd "$WORK_DIR"
 
-    # Test to skip
+    # Base tests to skip across all models
     # TODO: re-enable the 2 chat_completion_non_streaming tests once they contain include max tokens (to prevent them from rambling)
     # test_openai_completion_guided_choice needs vllm  >= v0.12.0 https://github.com/llamastack/llama-stack/issues/4984
     # test_openai_embeddings_with_dimensions and test_openai_embeddings_with_encoding_format_base64
@@ -61,11 +61,25 @@ function run_integration_tests() {
     # so vLLM correctly rejects these requests with a 400 error. sentence-transformers silently
     # truncated without validation, masking the issue.
     # test_openai_completion_logprobs{,_streaming}: upstream schema defines logprobs as bool, should be int https://github.com/llamastack/llama-stack/issues/5253
-    # test_openai_chat_completion_structured_output, test_simple_tool_call, test_streaming_tool_calls:
-    # These tests time out when running against Qwen3.5-0.8B on CPU in CI. Structured output
-    # and tool calling require constrained decoding which is significantly slower on CPU,
-    # exceeding the 30s fixture timeout.
-    SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls"
+    SKIP_TESTS="test_text_chat_completion_tool_calling_tools_not_in_request or test_text_chat_completion_structured_output or test_text_chat_completion_non_streaming or test_openai_chat_completion_non_streaming or test_openai_chat_completion_with_tool_choice_none or test_openai_chat_completion_with_tools or test_openai_format_preserves_complex_schemas or test_multiple_tools_with_different_schemas or test_tool_with_complex_schema or test_tool_without_schema or test_openai_completion_guided_choice or test_openai_embeddings_with_dimensions or test_openai_embeddings_with_encoding_format_base64 or test_openai_completion_logprobs or test_openai_completion_logprobs_streaming"
+
+    # CPU-constrained tool calling / structured output timeouts (e.g. local vLLM on CPU in CI)
+    if [[ "$model" == vllm* ]] || [[ "$model" == *Qwen* ]]; then
+        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls"
+    fi
+
+    # Gemini / Vertex AI provider specific payload & deserialization bugs
+    # - test_openai_chat_completion_streaming{,_with_n}: ogx_open_client SDK serializes timeout=120 into HTTP body, rejected with 400 by Vertex AI.
+    # - test_inference_store_tool_calls: ogx_open_client SDK tool call chunk deserialization fails on Gemini streaming.
+    if [[ "$model" == gemini* ]] || [[ "$model" == vertexai* ]]; then
+        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_streaming or test_openai_chat_completion_streaming_with_n or test_inference_store_tool_calls"
+    fi
+
+    # Anthropic provider specific structured output schema error
+    # - test_openai_chat_completion_structured_output: Anthropic requires response_format.json_schema.strict which upstream test fixtures omit.
+    if [[ "$model" == anthropic* ]]; then
+        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_structured_output"
+    fi
 
     # Dynamically determine the path to config.yaml from the original script directory
     STACK_CONFIG_PATH="$SCRIPT_DIR/../distribution/config.yaml"
