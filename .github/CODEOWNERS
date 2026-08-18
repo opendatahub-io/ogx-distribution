@@ -1,8 +1,1 @@
-# Each line is a file pattern followed by one or more owners.
-
-# These owners will own only documentation
-*.md @kelbrown20
-
-# These owners will own only CI and testing related infrastructure
-.github/ @Artemon-line @kami619
-tests/ @Artemon-line @kami619
+* @opendatahub-io/llama-team
