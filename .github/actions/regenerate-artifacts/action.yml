@@ -1,5 +1,5 @@
 name: Regenerate distribution artifacts
-description: Run the build scripts that regenerate config, lockfiles, Containerfile, and verify secrets
+description: Run the build scripts that regenerate config, lockfiles, Containerfile, distribution docs, and verify secrets
 
 inputs:
   ogx-version:
@@ -26,3 +26,4 @@ runs:
         uv run build/gen_config.py
         ./build/run_gen_lockfile.sh
         uv run build/gen_containerfile.py
+        uv run build/gen_distro_docs.py
