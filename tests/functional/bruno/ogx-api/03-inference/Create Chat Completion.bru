@@ -1,0 +1,54 @@
+meta {
+  name: Create Chat Completion
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/chat/completions
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "model": "{{model}}",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Say hello in one word."
+      }
+    ],
+    "max_tokens": 16
+  }
+}
+
+script:pre-request {
+  const model = bru.getEnvVar("model");
+  if (!/^[a-zA-Z0-9.\-_\/]+$/.test(model)) {
+    throw new Error("Invalid model identifier: " + model);
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has choices array", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("choices");
+    expect(body.choices).to.be.an("array");
+    expect(body.choices.length).to.be.greaterThan(0);
+  });
+  test("First choice has message content", function() {
+    const body = res.getBody();
+    const msg = body.choices[0].message;
+    expect(msg).to.have.property("content");
+    expect(msg.content).to.be.a("string");
+  });
+  test("Response model matches configured model", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("model");
+    expect(body.model).to.eql(bru.getEnvVar("model"));
+  });
+}

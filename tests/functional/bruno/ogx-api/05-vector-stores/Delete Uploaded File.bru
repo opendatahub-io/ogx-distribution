@@ -1,0 +1,17 @@
+meta {
+  name: Delete Uploaded File
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/v1/files/{{vs_file_id}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Status is 200 or 204", function() {
+    expect([200, 204]).to.include(res.getStatus());
+  });
+}

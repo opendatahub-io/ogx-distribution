@@ -1,0 +1,21 @@
+meta {
+  name: Verify File Deleted
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/files/{{fp_file_id}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("File ID was set", function() {
+    const fileId = bru.getVar("fp_file_id");
+    expect(fileId).to.be.a("string").and.not.empty;
+  });
+  test("Deleted file returns 404", function() {
+    expect(res.getStatus()).to.eql(404);
+  });
+}

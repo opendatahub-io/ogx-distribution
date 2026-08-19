@@ -1,0 +1,30 @@
+meta {
+  name: Get Model
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/models/{{model}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  const model = bru.getEnvVar("model");
+  if (!/^[a-zA-Z0-9.\-_\/]+$/.test(model)) {
+    throw new Error("Invalid model identifier: " + model);
+  }
+}
+
+tests {
+  test("Status is 200", function() {
+    expect(res.getStatus()).to.eql(200);
+  });
+  test("Response has matching model identifier", function() {
+    const body = res.getBody();
+    expect(body).to.have.property("identifier");
+    expect(body.identifier).to.be.a("string");
+    expect(body.identifier).to.eql(bru.getEnvVar("model"));
+  });
+}
