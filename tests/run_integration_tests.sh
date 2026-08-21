@@ -68,11 +68,11 @@ function run_integration_tests() {
         SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls"
     fi
 
-    # Gemini / Vertex AI provider specific payload & deserialization bugs
-    # - test_openai_chat_completion_streaming{,_with_n}: ogx_open_client SDK serializes timeout=120 into HTTP body, rejected with 400 by Vertex AI.
-    # - test_inference_store_tool_calls: ogx_open_client SDK tool call chunk deserialization fails on Gemini streaming.
-    if [[ "$model" == gemini* ]] || [[ "$model" == vertexai* ]]; then
-        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_streaming or test_openai_chat_completion_streaming_with_n or test_inference_store_tool_calls"
+    # Azure / Gemini / Vertex AI provider specific payload & deserialization bugs
+    # - test_openai_chat_completion_streaming{,_with_n}: ogx_open_client SDK serializes timeout=120 into HTTP body, rejected with 400 by Azure & Vertex AI.
+    # - test_inference_store{,_tool_calls}: ogx_open_client SDK chunk deserialization issue on streaming responses.
+    if [[ "$model" == gemini* ]] || [[ "$model" == vertexai* ]] || [[ "$model" == azure* ]]; then
+        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_streaming or test_openai_chat_completion_streaming_with_n or test_inference_store or test_inference_store_tool_calls"
     fi
 
     # Anthropic provider specific structured output schema error
@@ -110,11 +110,13 @@ function main() {
     echo "  OPENAI_INFERENCE_MODEL: $OPENAI_INFERENCE_MODEL"
     echo "  GEMINI_INFERENCE_MODEL: ${GEMINI_INFERENCE_MODEL:-<not set>}"
     echo "  ANTHROPIC_INFERENCE_MODEL: ${ANTHROPIC_INFERENCE_MODEL:-<not set>}"
+    echo "  AZURE_INFERENCE_MODEL: ${AZURE_INFERENCE_MODEL:-<not set>}"
     echo "  EMBEDDING_MODEL: $EMBEDDING_MODEL"
     echo "  VERTEX_AI_PROJECT: ${VERTEX_AI_PROJECT:-<not set>}"
     echo "  OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
     echo "  GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}"
     echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+<set>}"
+    echo "  AZURE_API_KEY: ${AZURE_API_KEY:+<set>}"
 
     clone_ogx
 
@@ -152,6 +154,14 @@ function main() {
         models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
     else
         echo "ANTHROPIC_API_KEY is not set, skipping Anthropic models"
+    fi
+
+    # Only include Azure models if AZURE_API_KEY is set
+    if [ -n "${AZURE_API_KEY:-}" ]; then
+        echo "AZURE_API_KEY is set, including Azure models in tests"
+        models_to_test+=("$AZURE_INFERENCE_MODEL")
+    else
+        echo "AZURE_API_KEY is not set, skipping Azure models"
     fi
 
     for model in "${models_to_test[@]}"; do

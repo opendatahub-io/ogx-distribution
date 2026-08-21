@@ -1,4 +1,4 @@
-name: "Responses: OpenAI"
+name: "Responses: Azure OpenAI"
 
 on:
   workflow_call:
@@ -21,8 +21,8 @@ on:
         type: string
 
 env:
-  PROVIDER_NAME: openai
-  EMBEDDING_MODEL: openai/text-embedding-3-small
+  PROVIDER_NAME: azure
+  EMBEDDING_MODEL: azure/text-embedding-3-small
   IMAGE_NAME: quay.io/opendatahub/odh-ogx-core
   IMAGE_TAG: ${{ inputs.image_tag || 'source-b5c18de28794baaf537b2683271a5043ccd42426-6515a120edf38a477a55b037e745752f2535661c' }}
 
@@ -33,13 +33,17 @@ jobs:
       enabled: ${{ steps.check.outputs.enabled }}
       models_json: ${{ steps.models.outputs.json }}
     steps:
-      - name: Check OpenAI credentials
+      - name: Check Azure credentials
         id: check
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_OPENAI_RESOURCE_GROUP: ${{ secrets.AZURE_OPENAI_RESOURCE_GROUP }}
         run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "::warning::OPENAI_API_KEY not configured, skipping tests"
+          if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_TENANT_ID" ] || [ -z "$AZURE_SUBSCRIPTION_ID" ] || [ -z "$AZURE_OPENAI_RESOURCE" ] || [ -z "$AZURE_OPENAI_RESOURCE_GROUP" ]; then
+            echo "::warning::Azure credentials not configured, skipping tests"
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
@@ -47,9 +51,9 @@ jobs:
       - name: Resolve models
         id: models
         env:
-          INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_OPENAI }}
+          INPUT_MODELS: ${{ inputs.models || vars.TEST_MODELS_AZURE }}
         run: |
-          default='["openai/gpt-4.1-nano"]'
+          default='["azure/gpt-4o-mini"]'
           if [ -z "$INPUT_MODELS" ]; then
             echo "json=$default" >> "$GITHUB_OUTPUT"
           else
@@ -65,17 +69,40 @@ jobs:
       matrix:
         model: ${{ fromJson(needs.check.outputs.models_json) }}
     permissions:
+      id-token: write
       contents: read
       checks: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           python-version: 3.12
           enable-cache: false
+
+      - name: Authenticate to Azure
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch Azure OpenAI API key
+        id: azkey
+        env:
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_OPENAI_RESOURCE_GROUP: ${{ secrets.AZURE_OPENAI_RESOURCE_GROUP }}
+        run: |
+          key=$(az cognitiveservices account keys list \
+            --name "$AZURE_OPENAI_RESOURCE" \
+            --resource-group "$AZURE_OPENAI_RESOURCE_GROUP" \
+            --query key1 -o tsv)
+          echo "::add-mask::$key"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
 
       - name: Setup PostgreSQL
         uses: ./.github/actions/setup-postgres
@@ -86,11 +113,15 @@ jobs:
           image_name: ${{ env.IMAGE_NAME }}
           image_tag: ${{ env.IMAGE_TAG }}
           extra_env: |
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            AZURE_API_KEY=${{ steps.azkey.outputs.key }}
+            AZURE_API_BASE=${{ secrets.AZURE_API_BASE }}
+            AZURE_API_VERSION=${{ secrets.AZURE_API_VERSION }}
+            AZURE_API_TYPE=azure
             TAVILY_SEARCH_API_KEY=${{ secrets.TAVILY_SEARCH_API_KEY }}
-            EMBEDDING_MODEL=openai/text-embedding-3-small
-            EMBEDDING_PROVIDER=openai
+            EMBEDDING_MODEL=azure/text-embedding-3-small
+            EMBEDDING_PROVIDER=azure
             EMBEDDING_PROVIDER_MODEL_ID=text-embedding-3-small
+            EMBEDDING_DIMENSION=1536
 
       - name: Clone upstream tests
         shell: bash
@@ -145,11 +176,11 @@ jobs:
       - name: Scrub secrets from test results
         if: ${{ !cancelled() }}
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AZURE_API_KEY: ${{ steps.azkey.outputs.key }}
           TAVILY_SEARCH_API_KEY: ${{ secrets.TAVILY_SEARCH_API_KEY }}
         run: |
           ./tests/scrub_secrets.sh '/tmp/test-results/*' \
-            OPENAI_API_KEY TAVILY_SEARCH_API_KEY
+            AZURE_API_KEY TAVILY_SEARCH_API_KEY
 
       - name: Upload artifacts
         if: ${{ !cancelled() }}

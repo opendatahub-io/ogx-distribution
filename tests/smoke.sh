@@ -77,6 +77,15 @@ function start_and_wait_for_ogx_container {
     docker_args+=(--env "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
   fi
 
+  # Only add Azure configuration if AZURE_API_KEY is set
+  if [ -n "${AZURE_API_KEY:-}" ]; then
+    docker_args+=(
+      --env "AZURE_API_KEY=$AZURE_API_KEY"
+      ${AZURE_API_BASE:+--env "AZURE_API_BASE=$AZURE_API_BASE"}
+      ${AZURE_API_VERSION:+--env "AZURE_API_VERSION=$AZURE_API_VERSION"}
+    )
+  fi
+
   docker_args+=(--name ogx "$IMAGE_NAME:${IMAGE_TAG:-$GITHUB_SHA}")
 
   # Start ogx
@@ -408,6 +417,15 @@ main() {
       inference_models_to_test+=("$ANTHROPIC_INFERENCE_MODEL")
     else
       echo "===> ANTHROPIC_API_KEY is not set, skipping Anthropic models"
+    fi
+
+    # Only include Azure models if AZURE_API_KEY is set
+    if [ -n "${AZURE_API_KEY:-}" ]; then
+      echo "===> AZURE_API_KEY is set, including Azure models in tests"
+      models_to_test+=("$AZURE_INFERENCE_MODEL")
+      inference_models_to_test+=("$AZURE_INFERENCE_MODEL")
+    else
+      echo "===> AZURE_API_KEY is not set, skipping Azure models"
     fi
 
     echo "===> Testing model list for all models..."

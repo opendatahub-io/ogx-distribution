@@ -68,12 +68,21 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+      AZURE_OPENAI_RESOURCE_GROUP: ${{ secrets.AZURE_OPENAI_RESOURCE_GROUP }}
+      AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+      AZURE_API_BASE: ${{ secrets.AZURE_API_BASE }}
+      AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
       # Model names - set defaults, overridden by MaaS configuration step
       VERTEX_AI_INFERENCE_MODEL: vertexai/publishers/google/models/gemini-2.5-flash
       VLLM_INFERENCE_MODEL: vllm-inference/Qwen/Qwen3.5-0.8B
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
       ANTHROPIC_INFERENCE_MODEL: anthropic/claude-sonnet-4-6
+      AZURE_INFERENCE_MODEL: azure/gpt-4o
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
@@ -148,7 +157,7 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ] || [ "${{ github.secret_source }}" = "Dependabot" ]; then
               echo "::warning::Fork/Dependabot PR — unsetting all provider credentials"
-              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; } >> "$GITHUB_ENV"
+              { echo "VERTEX_AI_PROJECT="; echo "GCP_WORKLOAD_IDENTITY_PROVIDER="; echo "AZURE_CLIENT_ID="; echo "AZURE_TENANT_ID="; echo "AZURE_SUBSCRIPTION_ID="; echo "OPENAI_API_KEY="; echo "GEMINI_API_KEY="; echo "ENABLE_GEMINI="; echo "ANTHROPIC_API_KEY="; echo "AZURE_API_KEY="; } >> "$GITHUB_ENV"
               exit 0
             fi
           fi
@@ -198,6 +207,12 @@ jobs:
             fi
           fi
 
+          # Azure: presence check (auth validated by azure/login OIDC step)
+          if [ -z "${AZURE_CLIENT_ID:-}" ] && [ -z "${AZURE_API_KEY:-}" ]; then
+            echo "::warning::Azure credentials not configured, skipping Azure tests"
+            { echo "AZURE_CLIENT_ID="; echo "AZURE_API_KEY="; } >> "$GITHUB_ENV"
+          fi
+
           # MaaS vLLM: presence check
           if [ -z "$_MAAS_VLLM_URL" ]; then
             echo "::warning::MaaS vLLM URL not configured, will use local vLLM"
@@ -235,6 +250,27 @@ jobs:
         with:
           project_id: ${{ env.VERTEX_AI_PROJECT }}
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Authenticate to Azure (OIDC)
+        if: env.AZURE_CLIENT_ID != '' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch Azure OpenAI API key via OIDC
+        if: env.AZURE_CLIENT_ID != '' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
+        env:
+          AZURE_OPENAI_RESOURCE: ${{ secrets.AZURE_OPENAI_RESOURCE }}
+          AZURE_OPENAI_RESOURCE_GROUP: ${{ secrets.AZURE_OPENAI_RESOURCE_GROUP }}
+        run: |
+          key=$(az cognitiveservices account keys list \
+            --name "$AZURE_OPENAI_RESOURCE" \
+            --resource-group "$AZURE_OPENAI_RESOURCE_GROUP" \
+            --query key1 -o tsv)
+          echo "::add-mask::$key"
+          echo "AZURE_API_KEY=$key" >> "$GITHUB_ENV"
 
       - name: Setup vLLM inference container
         if: github.event_name != 'workflow_dispatch' && env.USING_MAAS != 'true'
@@ -307,7 +343,7 @@ jobs:
           # Scrub secret values from log files before upload (CWE-532)
           ./tests/scrub_secrets.sh 'logs/*.log' \
             VLLM_API_TOKEN VLLM_EMBEDDING_API_TOKEN \
-            OPENAI_API_KEY GEMINI_API_KEY ANTHROPIC_API_KEY \
+            OPENAI_API_KEY GEMINI_API_KEY ANTHROPIC_API_KEY AZURE_API_KEY \
             POSTGRES_PASSWORD PGVECTOR_PASSWORD \
             GOOGLE_APPLICATION_CREDENTIALS
 
