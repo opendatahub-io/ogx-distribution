@@ -28,3 +28,7 @@ tests/functional/reports/
 tests/functional/uv.lock
 tests/functional/bruno/package-lock.json
 tests/functional/bruno/pnpm-lock.yaml
+
+# Prefetched model/data OCI artifact staged into the build context by CI
+# (actions/cache); never committed. The directory itself is kept via .gitkeep.
+distribution/artifact-cache/.cache/

@@ -1,0 +1,4 @@
+# Placeholder so distribution/artifact-cache/ always exists as a build-context
+# bind-mount source for the Containerfile. In CI, actions/cache restores the
+# model/data OCI artifact into ./.cache here; those files are gitignored and
+# never committed. See .github/actions/prefetch-artifact and CLAUDE.md.

@@ -100,6 +100,7 @@ jobs:
           PR_NUMBER: ${{ inputs.pr_number }}
           PR_SHA: ${{ steps.pr-info.outputs.sha }}
           PUSH_SHA: ${{ github.sha }}
+          ORAS_TOKEN: ${{ secrets.REDHAT_STAGE_REGISTRY_TOKEN }}
         run: |
           if [ -n "$PR_NUMBER" ]; then
             if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
@@ -117,7 +118,11 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building image: ogx-test:$TAG"
-          podman build -f Containerfile -t "ogx-test:$TAG" .
+          # Stage-registry token for `oras pull` of the model/data OCI artifact.
+          ORAS_TOKEN_FILE="$(mktemp)"
+          printf '%s' "$ORAS_TOKEN" > "$ORAS_TOKEN_FILE"
+          trap 'rm -f "$ORAS_TOKEN_FILE"' EXIT
+          podman build --secret "id=oras-token,src=$ORAS_TOKEN_FILE" -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Save image as artifact
         env:

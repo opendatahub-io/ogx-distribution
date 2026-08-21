@@ -43,12 +43,18 @@ jobs:
       - name: Build image
         id: build
         working-directory: ogx-distribution
+        env:
+          ORAS_TOKEN: ${{ secrets.REDHAT_STAGE_REGISTRY_TOKEN }}
         run: |
           SHORT_SHA="${GITHUB_SHA:0:12}"
           TAG="upstream-main-${SHORT_SHA}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building image with OGX_VERSION=main: ogx-test:$TAG"
-          podman build -f Containerfile -t "ogx-test:$TAG" .
+          # Stage-registry token for `oras pull` of the model/data OCI artifact.
+          ORAS_TOKEN_FILE="$(mktemp)"
+          printf '%s' "$ORAS_TOKEN" > "$ORAS_TOKEN_FILE"
+          trap 'rm -f "$ORAS_TOKEN_FILE"' EXIT
+          podman build --secret "id=oras-token,src=$ORAS_TOKEN_FILE" -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Setup CI environment
         id: setup

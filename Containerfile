@@ -1,6 +1,25 @@
 # WARNING: This file is auto-generated from Containerfile.in
 # by build/gen_containerfile.py - do not edit manually.
+# oras CLI (multi-arch image, so cross-arch builds resolve the correct binary),
+# used to pull the model/data OCI artifact below.
+FROM ghcr.io/oras-project/oras:v1.2.3@sha256:63266a046d1cf5ebebb1461733ed7548148f122e0d422096e177cfa70b521cb1 AS oras
+
+# Carries any pre-fetched artifact cache staged in the build context. Bind
+# mounting from this stage (rather than the context directly) gives the files a
+# proper mount label and keeps them out of the final image's layers.
+FROM scratch AS artifact-cache-src
+COPY distribution/artifact-cache /artifact-cache
+
 FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
+
+# Model/data artifacts are consumed from a pre-published, ProdSec-scanned OCI
+# artifact instead of being downloaded from HF/ModelScope at build time.
+# OGX_ARTIFACT_SOURCE selects how they are obtained (no fallback between modes):
+#   pull  - pull the artifact directly with oras (default; non-fork/local/Konflux)
+#   cache - copy from a cache staged in the build context (fork CI builds)
+ARG OGX_ARTIFACT_IMAGE=registry.stage.redhat.io/rhai/redhatai-ogx-distribution:3.0
+ARG OGX_ARTIFACT_REGISTRY_USER=agentic-api
+ARG OGX_ARTIFACT_SOURCE=pull
 
 COPY distribution/requirements-lock.txt ${APP_ROOT}/requirements-lock.txt
 # Package docling transitively pulls in opencv-python via rapidocr.
@@ -12,12 +31,39 @@ RUN uv pip sync --verify-hashes ${APP_ROOT}/requirements-lock.txt \
     && uv pip uninstall opencv-python \
     && uv pip install "opencv-python-headless==${OPENCV_VERSION}"
 
-COPY distribution/fetch_artifacts.py ${APP_ROOT}/fetch_artifacts.py
-COPY --chmod=755 distribution/copy-artifacts.sh ${APP_ROOT}/copy-artifacts.sh
-COPY distribution/artifacts.lock.yaml ${APP_ROOT}/artifacts.lock.yaml
-RUN --mount=type=cache,target=/var/cache/artifacts,uid=1001,gid=0 \
-    uv run ${APP_ROOT}/fetch_artifacts.py ${APP_ROOT}/artifacts.lock.yaml /var/cache/artifacts \
-    && ${APP_ROOT}/copy-artifacts.sh /var/cache/artifacts
+COPY --from=oras /bin/oras /usr/local/bin/oras
+# Model/data artifacts. Files in the artifact are stored .cache-relative, so
+# they land under ${APP_ROOT}/.cache at the paths OGX expects (including the HF
+# hub refs/main marker, which the artifact provides directly).
+#
+# The mode is explicit with no fallback: 'pull' hard-fails if the oras pull
+# fails; 'cache' hard-fails if no cache is staged in the build context. The
+# token is mounted as a build secret so it never lands in argv, logs, or a
+# layer; the bind mount keeps the staged copy out of the image layers.
+RUN --mount=type=bind,from=artifact-cache-src,source=/artifact-cache,target=/artifact-cache \
+    --mount=type=secret,id=oras-token,uid=1001 \
+    mkdir -p ${APP_ROOT}/.cache \
+    && case "${OGX_ARTIFACT_SOURCE}" in \
+         pull) \
+           echo "Pulling model/data OCI artifact via oras"; \
+           oras pull "${OGX_ARTIFACT_IMAGE}" \
+             --username "${OGX_ARTIFACT_REGISTRY_USER}" --password-stdin < /run/secrets/oras-token \
+             --output ${APP_ROOT}/.cache; \
+           ;; \
+         cache) \
+           echo "Using staged artifact cache from build context"; \
+           if [ ! -d /artifact-cache/.cache ]; then \
+             echo "ERROR: OGX_ARTIFACT_SOURCE=cache but no cache is staged in the build context" >&2; \
+             exit 1; \
+           fi; \
+           cp -a /artifact-cache/.cache/. ${APP_ROOT}/.cache/; \
+           ;; \
+         *) \
+           echo "ERROR: OGX_ARTIFACT_SOURCE must be 'pull' or 'cache' (got '${OGX_ARTIFACT_SOURCE}')" >&2; \
+           exit 1; \
+           ;; \
+       esac \
+    && rm -f ${APP_ROOT}/.cache/README.md
 ENV DOCLING_ARTIFACTS_PATH="${APP_ROOT}/.cache/docling/models"
 ENV HF_HOME="${APP_ROOT}/.cache/huggingface"
 ENV TIKTOKEN_CACHE_DIR="${APP_ROOT}/.cache/tiktoken"

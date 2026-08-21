@@ -36,6 +36,14 @@ spec:
     value: pull-request
   - name: enable-early-gate-testing
     value: "false"
+  # Pull the model/data OCI artifact during the build. The token (username
+  # agentic-api) is provided by the namespace secret below, whose 'oras-token'
+  # key is mounted as the build secret the Containerfile reads.
+  - name: build-args
+    value:
+    - OGX_ARTIFACT_SOURCE=pull
+  - name: additional-build-secret
+    value: redhat-stage-registry-token
   pipelineRef:
     resolver: git
     params:
