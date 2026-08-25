@@ -663,9 +663,9 @@ doclang==0.7.3 \
     --hash=sha256:9440c4ca9f7e061a7b8d33bdf15b1029be69a4c13cd8952dd6ce541884e4c685 \
     --hash=sha256:ca50615357e46ebf9597bb9065b9112367103ec24bd539f8ae12649224cf50b0
     # via docling-core
-docling==2.121.0 \
-    --hash=sha256:c8970cbd3907892db218c7f342ff62db5b393ca3cf568db50c8f2384e248a22d \
-    --hash=sha256:d1577ac7660ac6cb3ac7e213f1541f8bed1990ff8da4274d94b5bfc91e0fec55
+docling==2.122.0 \
+    --hash=sha256:30fd085e3ebd729e02f9c38e9361df95cb240e4e2d52c807f95043db6df8a677 \
+    --hash=sha256:3d41c43cc901e22711a28846f750510b4b72c3070561322ffba5c747f8a999cb
     # via -r /tmp/requirements.txt
 docling-core==2.92.0 \
     --hash=sha256:33fd25e38c199336447a21925374400aca13a6b9316a032f111972c2dc0f085c \
@@ -706,9 +706,9 @@ docling-parse==7.15.0 \
     --hash=sha256:f528916ec21c1bec5916db2e9c6ecac4c472fedd6aae4a9cf308f59cf8fcbd7b \
     --hash=sha256:fcb1b4e9a0e447f29e8248e46eea502ab4c7a75fe733a2ed911635a9b74b5092
     # via docling-slim
-docling-slim==2.121.0 \
-    --hash=sha256:c97fc9cd889b61a66b9cf5d2d87c6b6935f29fe7aacfd8fd39802be7425e4996 \
-    --hash=sha256:f3069ded34f62f4e6a4d2ffda78cba0baad2ced4944a4b2d70cb646670ef327b
+docling-slim==2.122.0 \
+    --hash=sha256:a04286ab35795855e0ca480ecb30e25eccd8fbf0e234aa8d534bd0cd5f89890e \
+    --hash=sha256:f5368d2f6713e90669194fc6bc3f6bc393446f979f6ee86da0426baddb200693
     # via
     #   -r /tmp/requirements.txt
     #   docling
@@ -1848,9 +1848,9 @@ numpy==2.5.2 \
     #   shapely
     #   torchvision
     #   transformers
-ogx @ git+https://github.com/opendatahub-io/ogx.git@25a1a7d44fbca1bdf18de4c908a3b0b4b5e8dcc9
+ogx @ git+https://github.com/opendatahub-io/ogx.git@e27ea281e2a46cd58b260f9a28fd824fbdd382ef
     # via -r /tmp/requirements.txt
-ogx-api @ git+https://github.com/opendatahub-io/ogx.git@25a1a7d44fbca1bdf18de4c908a3b0b4b5e8dcc9#subdirectory=src/ogx_api
+ogx-api @ git+https://github.com/opendatahub-io/ogx.git@e27ea281e2a46cd58b260f9a28fd824fbdd382ef#subdirectory=src/ogx_api
     # via
     #   -r /tmp/requirements.txt
     #   ogx
@@ -3305,9 +3305,7 @@ scikit-learn==1.9.0 \
     --hash=sha256:f401448645a3e7bc115aa3c094097865155b34bff1cba8101857d9104e99074c \
     --hash=sha256:f7e254636164090da847715a27f8e5478feb98c40a9e0ee90cbd277de9e5ceb8 \
     --hash=sha256:fd3a8ef0c758555a3b23c03adaa858af32f7736785ded50ad5991f59c4ed03fa
-    # via
-    #   -r /tmp/requirements.txt
-    #   sentence-transformers
+    # via sentence-transformers
 scipy==1.18.1 \
     --hash=sha256:011413b7426b75012840e35649e00fe0a2c3bae89fed433876e3a99251572efc \
     --hash=sha256:0ac49ea97594532dd44b7136094d35f5440fa06e6d9c6384a74c01764df388c5 \
