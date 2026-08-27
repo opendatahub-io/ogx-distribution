@@ -28,3 +28,9 @@ tests/functional/reports/
 tests/functional/uv.lock
 tests/functional/bruno/package-lock.json
 tests/functional/bruno/pnpm-lock.yaml
+
+# Prefetched modelcar /models tree staged into the build context by CI
+# (actions/cache); never committed. The .gitkeep is kept so the directory always
+# exists as a COPY source for the Containerfile's cache mode.
+distribution/artifact-cache/models/*
+!distribution/artifact-cache/models/.gitkeep

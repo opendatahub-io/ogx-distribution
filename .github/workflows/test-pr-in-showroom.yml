@@ -100,6 +100,7 @@ jobs:
           PR_NUMBER: ${{ inputs.pr_number }}
           PR_SHA: ${{ steps.pr-info.outputs.sha }}
           PUSH_SHA: ${{ github.sha }}
+          REGISTRY_TOKEN: ${{ secrets.REDHAT_STAGE_REGISTRY_TOKEN }}
         run: |
           if [ -n "$PR_NUMBER" ]; then
             if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
@@ -117,6 +118,8 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building image: ogx-test:$TAG"
+          # Log in to the stage registry so the build can pull the modelcar stage.
+          printf '%s' "$REGISTRY_TOKEN" | podman login registry.stage.redhat.io --username agentic-api --password-stdin
           podman build -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Save image as artifact

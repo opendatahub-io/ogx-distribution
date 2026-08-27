@@ -43,11 +43,15 @@ jobs:
       - name: Build image
         id: build
         working-directory: ogx-distribution
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REDHAT_STAGE_REGISTRY_TOKEN }}
         run: |
           SHORT_SHA="${GITHUB_SHA:0:12}"
           TAG="upstream-main-${SHORT_SHA}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building image with OGX_VERSION=main: ogx-test:$TAG"
+          # Log in to the stage registry so the build can pull the modelcar stage.
+          printf '%s' "$REGISTRY_TOKEN" | podman login registry.stage.redhat.io --username agentic-api --password-stdin
           podman build -f Containerfile -t "ogx-test:$TAG" .
 
       - name: Setup CI environment

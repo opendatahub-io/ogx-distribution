@@ -1,0 +1,4 @@
+# Placeholder so distribution/artifact-cache/models/ always exists as a COPY
+# source for the Containerfile's cache-mode stage. In CI, actions/cache restores
+# the modelcar's /models tree here (.github/actions/prefetch-artifact); those
+# files are gitignored and never committed. See CLAUDE.md.
