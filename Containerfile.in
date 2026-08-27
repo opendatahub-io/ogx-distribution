@@ -1,4 +1,34 @@
+# Model/data artifacts (docling models, HF embedding model, tiktoken encodings)
+# are consumed from a pre-published, ProdSec-scanned "modelcar" container image
+# instead of being downloaded from HF/ModelScope at build time. The modelcar
+# stores every file under /models in the layout OGX expects under .cache
+# (including the HF hub refs/main marker).
+#
+# OGX_ARTIFACT_SOURCE selects how the files are obtained (no fallback between modes):
+#   pull  - use the modelcar image directly as a build stage (default; non-fork/local/Konflux)
+#   cache - copy from a cache staged in the build context (fork CI builds)
+ARG OGX_MODELCAR_IMAGE=registry.stage.redhat.io/rhai/modelcar-redhatai-ogx-distribution:3.0
+ARG OGX_ARTIFACT_SOURCE=pull
+
+# pull mode: the modelcar image itself. Pulling it requires the builder to be
+# logged in to the stage registry (username agentic-api); the build fails if the
+# pull fails.
+FROM ${OGX_MODELCAR_IMAGE} AS modelcar-pull
+
+# cache mode: model/data files staged into the build context by CI
+# (.github/actions/prefetch-artifact), for fork/Dependabot builds that can't
+# reach the stage registry. COPYing them into a scratch stage keeps the staged
+# copy out of the final image's layers.
+FROM scratch AS modelcar-cache
+COPY distribution/artifact-cache/models /models
+
+# Select the source stage; both expose the model/data files at /models.
+FROM modelcar-${OGX_ARTIFACT_SOURCE} AS modelcar
+
 FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
+
+# Re-declared for use in the RUN below (global ARGs are not inherited by stages).
+ARG OGX_ARTIFACT_SOURCE
 
 COPY distribution/requirements-lock.txt ${APP_ROOT}/requirements-lock.txt
 # Package docling transitively pulls in opencv-python via rapidocr.
@@ -10,12 +40,18 @@ RUN uv pip sync --verify-hashes ${APP_ROOT}/requirements-lock.txt \
     && uv pip uninstall opencv-python \
     && uv pip install "opencv-python-headless==${OPENCV_VERSION}"
 
-COPY distribution/fetch_artifacts.py ${APP_ROOT}/fetch_artifacts.py
-COPY --chmod=755 distribution/copy-artifacts.sh ${APP_ROOT}/copy-artifacts.sh
-COPY distribution/artifacts.lock.yaml ${APP_ROOT}/artifacts.lock.yaml
-RUN --mount=type=cache,target=/var/cache/artifacts,uid=1001,gid=0 \
-    uv run ${APP_ROOT}/fetch_artifacts.py ${APP_ROOT}/artifacts.lock.yaml /var/cache/artifacts \
-    && ${APP_ROOT}/copy-artifacts.sh /var/cache/artifacts
+# Model/data artifacts from the selected modelcar stage. Files are stored
+# .cache-relative under /models, so their contents land under ${APP_ROOT}/.cache
+# at the paths OGX expects (including the HF hub refs/main marker, which the
+# modelcar provides directly). Owned by uid 1001 / group 0 for OpenShift.
+COPY --chown=1001:0 --from=modelcar /models ${APP_ROOT}/.cache
+# Drop the modelcar's docs and the cache-mode placeholder, then verify the
+# expected model trees are present (hard-fails a cold/empty fork cache).
+RUN rm -f ${APP_ROOT}/.cache/README.md ${APP_ROOT}/.cache/modelcard.md ${APP_ROOT}/.cache/.gitkeep \
+    && for d in docling huggingface tiktoken; do \
+         { [ -d "${APP_ROOT}/.cache/${d}" ] && [ -n "$(ls -A "${APP_ROOT}/.cache/${d}")" ]; } \
+           || { echo "ERROR: model/data cache missing or empty: .cache/${d} (OGX_ARTIFACT_SOURCE=${OGX_ARTIFACT_SOURCE})" >&2; exit 1; }; \
+       done
 ENV DOCLING_ARTIFACTS_PATH="${APP_ROOT}/.cache/docling/models"
 ENV HF_HOME="${APP_ROOT}/.cache/huggingface"
 ENV TIKTOKEN_CACHE_DIR="${APP_ROOT}/.cache/tiktoken"
