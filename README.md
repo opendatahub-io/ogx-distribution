@@ -83,7 +83,7 @@ An orchestrator workflow (`responses-weekly.yml` / "Responses: Test Report") run
 |----------|--------------------|-----------------|----------|
 | OpenAI | gpt-4.1-nano | text-embedding-3-small | `responses-openai.yml` |
 | Vertex AI | gemini-2.5-flash | gemini-embedding-2 | `responses-vertexai.yml` |
-| vLLM MaaS | llama-3-2-3b | nomic-embed-text-v1-5 | `responses-vllm-maas.yml` |
+| vLLM MaaS | Qwen3.6-35B-A3B | Nomic-embed-text-v2-moe | `responses-vllm-maas.yml` |
 
 ### How it works
 
@@ -121,7 +121,7 @@ To override models: pass comma-separated model IDs via the `models` input when d
 |----------|---------|
 | OpenAI | `OPENAI_API_KEY` |
 | Vertex AI | `VERTEX_AI_PROJECT`, `VERTEX_AI_LOCATION` (default: `global`), `GCP_WORKLOAD_IDENTITY_PROVIDER` |
-| vLLM MaaS | `MAAS_VLLM_URL`, `MAAS_VLLM_API_TOKEN`, `MAAS_EMBEDDING_URL`, `MAAS_EMBEDDING_API_TOKEN` |
+| vLLM MaaS | `LITEMAAS_API_KEY` (secret), `LITEMAAS_URL` (var), `LITEMAAS_INFERENCE_MODEL` (var), `LITEMAAS_EMBEDDING_MODEL` (var) |
 
 ## ARM64 Support
 
