@@ -95,7 +95,7 @@ jobs:
           echo "Updated OGX_VERSION to ${TAG}"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d # v10.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: 3.12
           enable-cache: false
@@ -130,9 +130,11 @@ jobs:
       - name: Commit and push
         id: commit
         run: |
+          # requirements-lock-konflux.txt exists only when RHAI_INDEX_URL is set
+          # in build/build.env; a branch created from main does not have it
           git add build/build.env Containerfile \
             distribution/config.yaml \
-            distribution/requirements-lock.txt distribution/requirements-lock-konflux.txt \
+            distribution/requirements-lock*.txt \
             distribution/README.md
           if git diff --cached --quiet; then
             echo "::notice::No changes to commit — version may already be set to ${TAG}"

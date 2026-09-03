@@ -31,6 +31,13 @@ spec:
     value: .
   - name: enable-early-gate-testing
     value: "false"
+  # Model/data files come from the modelcar image, pulled as a build stage during
+  # the build (OGX_ARTIFACT_SOURCE=pull). Pulling it from registry.stage.redhat.io
+  # (username agentic-api) requires the stage-registry pull secret to be linked to
+  # the build pipeline service account in the open-data-hub-tenant namespace.
+  - name: build-args
+    value:
+    - OGX_ARTIFACT_SOURCE=pull
   pipelineRef:
     resolver: git
     params:

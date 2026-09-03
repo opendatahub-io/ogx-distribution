@@ -47,7 +47,7 @@ providers:
     provider_type: remote::azure
     config:
       api_key: ${env.AZURE_API_KEY:=}
-      api_base: ${env.AZURE_API_BASE:=}
+      base_url: ${env.AZURE_API_BASE:=}
       api_version: ${env.AZURE_API_VERSION:=}
       api_type: ${env.AZURE_API_TYPE:=}
   - provider_id: ${env.VERTEX_AI_PROJECT:+vertexai}

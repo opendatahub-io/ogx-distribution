@@ -1,0 +1,63 @@
+name: Prefetch model/data modelcar
+description: >-
+  Restore the OGX modelcar's /models tree into the build context
+  (distribution/artifact-cache/models) via actions/cache, keeping the cache warm
+  so fork PRs (which build in cache mode) can restore it. On a cache miss,
+  extract it from the modelcar image when a stage-registry token is available;
+  without a token (fork/Dependabot PRs) nothing is staged, so a fork build with a
+  cold cache hard-fails in its cache step.
+
+inputs:
+  modelcar-image:
+    description: Modelcar image reference to extract models from
+    required: false
+    default: registry.stage.redhat.io/rhai/modelcar-redhatai-ogx-distribution:3.0
+  registry-user:
+    description: Stage-registry username
+    required: false
+    default: agentic-api
+  registry-token:
+    description: Stage-registry token (empty on fork/Dependabot PRs)
+    required: false
+    default: ''
+  working-directory:
+    description: Directory containing the checked-out repo
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Restore modelcar cache
+      id: cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ inputs.working-directory }}/distribution/artifact-cache/models
+        key: modelcar-${{ inputs.modelcar-image }}
+
+    - name: Extract models on cache miss
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        REGISTRY_TOKEN: ${{ inputs.registry-token }}
+        MODELCAR_IMAGE: ${{ inputs.modelcar-image }}
+        REGISTRY_USER: ${{ inputs.registry-user }}
+      run: |
+        set -euo pipefail
+        if [ -z "${REGISTRY_TOKEN}" ]; then
+          echo "::notice::No stage-registry token (fork/Dependabot PR?); cannot populate cache. A fork build relies on the cache restored from the base branch."
+          exit 0
+        fi
+        registry="${MODELCAR_IMAGE%%/*}"
+        printf '%s' "${REGISTRY_TOKEN}" | docker login "${registry}" \
+          --username "${REGISTRY_USER}" --password-stdin
+        docker pull "${MODELCAR_IMAGE}"
+        cid="$(docker create "${MODELCAR_IMAGE}")"
+        trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
+        mkdir -p distribution/artifact-cache/models
+        # Copy the contents of /models (arch-independent) into the staged tree.
+        docker cp "${cid}:/models/." distribution/artifact-cache/models/
+        rm -f distribution/artifact-cache/models/README.md \
+              distribution/artifact-cache/models/modelcard.md
+        echo "Prefetched modelcar /models into distribution/artifact-cache/models"

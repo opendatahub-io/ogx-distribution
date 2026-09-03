@@ -68,11 +68,11 @@ function run_integration_tests() {
         SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_structured_output or test_simple_tool_call or test_streaming_tool_calls"
     fi
 
-    # Gemini / Vertex AI provider specific payload & deserialization bugs
-    # - test_openai_chat_completion_streaming{,_with_n}: ogx_open_client SDK serializes timeout=120 into HTTP body, rejected with 400 by Vertex AI.
-    # - test_inference_store_tool_calls: ogx_open_client SDK tool call chunk deserialization fails on Gemini streaming.
-    if [[ "$model" == gemini* ]] || [[ "$model" == vertexai* ]]; then
-        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_streaming or test_openai_chat_completion_streaming_with_n or test_inference_store_tool_calls"
+    # Azure / Gemini / Vertex AI provider specific payload & deserialization bugs
+    # - test_openai_chat_completion_streaming{,_with_n}: ogx_open_client SDK serializes timeout=120 into HTTP body, rejected with 400 by Azure & Vertex AI.
+    # - test_inference_store{,_tool_calls}: ogx_open_client SDK chunk deserialization issue on streaming responses.
+    if [[ "$model" == gemini* ]] || [[ "$model" == vertexai* ]] || [[ "$model" == azure* ]]; then
+        SKIP_TESTS="$SKIP_TESTS or test_openai_chat_completion_streaming or test_openai_chat_completion_streaming_with_n or test_inference_store or test_inference_store_tool_calls"
     fi
 
     # Anthropic provider specific structured output schema error
@@ -116,6 +116,7 @@ function main() {
     echo "  GEMINI_INFERENCE_MODEL: ${GEMINI_INFERENCE_MODEL:-<not set>}"
     echo "  ANTHROPIC_INFERENCE_MODEL: ${ANTHROPIC_INFERENCE_MODEL:-<not set>}"
     echo "  BEDROCK_INFERENCE_MODEL: ${BEDROCK_INFERENCE_MODEL:-<not set>}"
+    echo "  AZURE_INFERENCE_MODEL: ${AZURE_INFERENCE_MODEL:-<not set>}"
     echo "  EMBEDDING_MODEL: $EMBEDDING_MODEL"
     echo "  VERTEX_AI_PROJECT: ${VERTEX_AI_PROJECT:-<not set>}"
     echo "  OPENAI_API_KEY: ${OPENAI_API_KEY:+<set>}"
@@ -123,6 +124,7 @@ function main() {
     echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+<set>}"
     echo "  AWS_BEDROCK_ROLE_ARN: ${AWS_BEDROCK_ROLE_ARN:+<set>}"
     echo "  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:+<set>}"
+    echo "  AZURE_API_KEY: ${AZURE_API_KEY:+<set>}"
 
     clone_ogx
 
@@ -161,12 +163,21 @@ function main() {
     else
         echo "ANTHROPIC_API_KEY is not set, skipping Anthropic models"
     fi
-
+    
+    # Only include AWS Bedrock models if AWS_BEDROCK_ROLE_ARN and AWS_ACCESS_KEY_ID are set
     if [ -n "${AWS_BEDROCK_ROLE_ARN:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
         echo "Bedrock credentials available, including Bedrock models in tests"
         models_to_test+=("$BEDROCK_INFERENCE_MODEL")
     else
         echo "Bedrock credentials not available, skipping Bedrock models"
+    fi
+    
+    # Only include Azure models if AZURE_API_KEY is set
+    if [ -n "${AZURE_API_KEY:-}" ]; then
+        echo "AZURE_API_KEY is set, including Azure models in tests"
+        models_to_test+=("$AZURE_INFERENCE_MODEL")
+    else
+        echo "AZURE_API_KEY is not set, skipping Azure models"
     fi
 
     for model in "${models_to_test[@]}"; do
