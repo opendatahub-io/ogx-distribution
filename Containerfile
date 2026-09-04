@@ -1,6 +1,6 @@
 # WARNING: This file is auto-generated from Containerfile.in
 # by build/gen_containerfile.py - do not edit manually.
-FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
+FROM quay.io/opendatahub/odh-midstream-python-base-3-12@sha256:e27aca1999813a9f4f476f4e4fbf1228f98ae67d52f40b70887558f41a14a8a9
 
 COPY distribution/requirements-lock.txt ${APP_ROOT}/requirements-lock.txt
 # Package docling transitively pulls in opencv-python via rapidocr.
