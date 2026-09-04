@@ -23,6 +23,7 @@ on:
       - main
       - rhoai-v*
       - release-*
+      - ntsh
 
   # build a custom image from an arbitrary ogx commit
   # NOTE: workflow_dispatch intentionally skips all tests (vllm setup, postgres setup, smoke tests, integration tests)
@@ -51,14 +52,8 @@ jobs:
   build-test:
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-            platform: linux/amd64
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            platform: linux/arm64
+      # The ntsh branch is reserved for amd64 smoke-test debugging.
+      matrix: ${{ fromJSON(github.ref == 'refs/heads/ntsh' && '{"include":[{"arch":"amd64","runner":"ubuntu-24.04","platform":"linux/amd64"}]}' || '{"include":[{"arch":"amd64","runner":"ubuntu-24.04","platform":"linux/amd64"},{"arch":"arm64","runner":"ubuntu-24.04-arm","platform":"linux/arm64"}]}') }}
     runs-on: ${{ matrix.runner }}
     outputs:
       distribution-changed: ${{ steps.distribution-changed.outputs.changed }}
@@ -267,7 +262,9 @@ jobs:
         shell: bash
         env:
           IMAGE_TAG: ${{ contains(fromJSON('["workflow_dispatch", "schedule"]'), github.event_name) && format('source-{0}-{1}', env.OGX_COMMIT_SHA, github.sha) || github.sha }}
-        run: ./tests/smoke.sh
+        run: |
+          mkdir -p logs
+          ./tests/smoke.sh 2>&1 | tee logs/smoke.log
 
       - name: Integration tests
         if: github.event_name != 'workflow_dispatch' && (matrix.arch == 'amd64' || env.USING_MAAS == 'true')
@@ -286,6 +283,11 @@ jobs:
           docker logs vllm-inference > logs/vllm-inference.log 2>&1 || echo "Failed to get vllm-inference logs" > logs/vllm-inference.log
           docker logs vllm-embedding > logs/vllm-embedding.log 2>&1 || echo "Failed to get vllm-embedding logs" > logs/vllm-embedding.log
           docker logs postgres > logs/postgres.log 2>&1 || echo "Failed to get postgres logs" > logs/postgres.log
+
+          # Preserve the responses that determine whether configured models are present.
+          curl -fsS --max-time 30 http://127.0.0.1:8321/v1/models > logs/models-response.json 2> logs/models-curl.log || true
+          curl -fsS --max-time 30 http://127.0.0.1:8321/v1/providers > logs/providers-response.json 2> logs/providers-curl.log || true
+          docker inspect ogx > logs/ogx-inspect.json 2> logs/ogx-inspect.log || true
 
           # Gather system information
           echo "=== System information ==="
@@ -322,6 +324,13 @@ jobs:
           name: ci-logs-${{ matrix.arch }}-${{ github.sha }}
           path: logs/
           retention-days: 7
+
+      - name: Open tmate session for failed ntsh debug run
+        if: failure() && github.ref == 'refs/heads/ntsh'
+        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3
+        with:
+          limit-access-to-actor: true
+          timeout-minutes: 30
 
       - name: Cleanup
         if: always()
@@ -377,7 +386,7 @@ jobs:
 
   publish:
     needs: build-test
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && needs.build-test.outputs.distribution-changed == 'true')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref != 'refs/heads/ntsh' && needs.build-test.outputs.distribution-changed == 'true')
     runs-on: ubuntu-latest
     env:
       OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
