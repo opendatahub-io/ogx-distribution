@@ -327,10 +327,10 @@ jobs:
 
       - name: Open tmate session for failed ntsh debug run
         if: failure() && github.ref == 'refs/heads/ntsh'
+        timeout-minutes: 60
         uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3
         with:
           limit-access-to-actor: true
-          timeout-minutes: 30
 
       - name: Cleanup
         if: always()
