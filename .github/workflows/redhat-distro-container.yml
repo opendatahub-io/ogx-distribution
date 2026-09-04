@@ -83,7 +83,7 @@ jobs:
       OPENAI_INFERENCE_MODEL: openai/gpt-5-nano
       GEMINI_INFERENCE_MODEL: gemini/models/gemini-2.5-flash
       ANTHROPIC_INFERENCE_MODEL: anthropic/claude-sonnet-4-6
-      BEDROCK_INFERENCE_MODEL: bedrock/openai.gpt-oss-20b-1:0
+      BEDROCK_INFERENCE_MODEL: bedrock/us.meta.llama3-1-8b-instruct-v1:0
       AZURE_INFERENCE_MODEL: azure/gpt-4o
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
