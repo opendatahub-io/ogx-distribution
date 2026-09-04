@@ -88,7 +88,7 @@ function start_and_wait_for_ogx_container {
     # Models are auto-discovered at startup via the ListFoundationModels
     # control-plane API (SigV4), so no config patching is needed.
   fi
-  
+
   # Only add Azure configuration if AZURE_API_KEY is set
   if [ -n "${AZURE_API_KEY:-}" ]; then
     docker_args+=(
@@ -430,7 +430,7 @@ main() {
     else
       echo "===> ANTHROPIC_API_KEY is not set, skipping Anthropic models"
     fi
-    
+
     # Only include AWS Bedrock models if AWS_BEDROCK_ROLE_ARN and AWS_ACCESS_KEY_ID are set
     if [ -n "${AWS_BEDROCK_ROLE_ARN:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
       echo "===> Bedrock credentials available, including Bedrock models in tests"
@@ -439,7 +439,7 @@ main() {
     else
       echo "===> Bedrock credentials not available, skipping Bedrock models"
     fi
-    
+
     # Only include Azure models if AZURE_API_KEY is set
     if [ -n "${AZURE_API_KEY:-}" ]; then
       echo "===> AZURE_API_KEY is set, including Azure models in tests"
