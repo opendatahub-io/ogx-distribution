@@ -22,9 +22,9 @@ annotated-types==0.8.0 \
     --hash=sha256:13b2beaad985e05e2d6407ee4c4f35590b11f8d693a258a561055cac8f64cab7 \
     --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0
     # via pydantic
-anthropic==1.3.0 \
-    --hash=sha256:6873492a77ede8849a161ab1bc78bc9a1e492a006d0b5bb4c57ac77845df838a \
-    --hash=sha256:e7e7dbebf9f3c84a23954ab989378af6ae10a4d1804c81e9fea4b5ced695ce75
+anthropic==1.4.0 \
+    --hash=sha256:590e85bff75b713a123b03f586d68f02266b5fdc49f70dd75f721ced93a4716c \
+    --hash=sha256:f0d017e901e48b343520b5d458f8240c283c8d850bf6d119834c622207e0a74c
     # via -r /tmp/requirements.txt
 antlr4-python3-runtime==4.9.3 \
     --hash=sha256:f224469b4168294902bb1efa80a8bf7855f24c99aef99cbefc1bcd3cce77881b
@@ -138,13 +138,13 @@ beautifulsoup4==4.15.0 \
     #   docling-slim
     #   markdownify
     #   markitdown
-boto3==1.43.88 \
-    --hash=sha256:62efee681fefc9b14244d66ab66ead11dd4a32fec0a54ac9f23106003ef210ca \
-    --hash=sha256:b3d03fba8ace049de27e3a6ed69b25a55d752f49d563394985e805ed5f0a0a74
+boto3==1.43.89 \
+    --hash=sha256:c28abbe472e9b7cad08807356311aeec51bde5218c18489da827045d2267bfd9 \
+    --hash=sha256:fe4190afe63eb562b6ba6a3911cf4427473b35fa047adde093bf696d3ae09fc0
     # via -r /tmp/requirements.txt
-botocore==1.43.88 \
-    --hash=sha256:1b59b6d74fb77b0c3934014b6693d56da4a9a172edb9454f9a5f711b4b3f7353 \
-    --hash=sha256:3c8a6e2292f05c590c5d5299934dd23c81d19a2b6dd70b9eb724f79bd432d04f
+botocore==1.43.89 \
+    --hash=sha256:d7211220c815427fe71225acc6909e4ab5dfab3b03770e72fd16cf9eb86b3d1a \
+    --hash=sha256:f0574942970742657b0e0716cf08c2dfe6bef8e6de5fbb7081c3424e262b4cca
     # via
     #   boto3
     #   s3transfer
@@ -664,13 +664,13 @@ doclang==0.7.3 \
     --hash=sha256:9440c4ca9f7e061a7b8d33bdf15b1029be69a4c13cd8952dd6ce541884e4c685 \
     --hash=sha256:ca50615357e46ebf9597bb9065b9112367103ec24bd539f8ae12649224cf50b0
     # via docling-core
-docling==2.125.0 \
-    --hash=sha256:09fe009f3a3a1f450bed1e3413346e8cdbbcdbdb95b53f30ec4ce4276edc8417 \
-    --hash=sha256:a28a00040f505991ef54b90c7d114f87122774e4977168efcfa304e05be51ee0
+docling==2.126.0 \
+    --hash=sha256:8a7f0f7767eea5a4dcdd2adce08c236c4d58e95e5025cae6657c619ca29efbca \
+    --hash=sha256:ce4515a2817b46bf62c8f00ababd5fc51851e8e4f435206f56c88169c2eac6dd
     # via -r /tmp/requirements.txt
-docling-core==2.94.1 \
-    --hash=sha256:830dc840b2edde03b6e49529bba61975b5d72a4000181b34d632a4dcd19e2e6c \
-    --hash=sha256:b7399ce466dcc8735b7981918f39525c01fce981eefbc6f46ee291c1feeea0dc
+docling-core==2.95.0 \
+    --hash=sha256:bdaace4c575512f3dba36c2978fc3bf67f7fbedc2e8b3c3660b03bdab044fde8 \
+    --hash=sha256:dd79a3db6d08a6d5f674fa66987aaf5c0f2705233cb329c2f19cd9472518796d
     # via
     #   docling-parse
     #   docling-slim
@@ -706,9 +706,9 @@ docling-parse==7.17.0 \
     --hash=sha256:edca5f6d63fea1f53e5fa6584ff5549e698f35a52778d66fef02e104340f5a74 \
     --hash=sha256:ee6352a24b26d11492cc1e57759f19318dc42ab866fa6de3cd1ee245729c04c2
     # via docling-slim
-docling-slim==2.125.0 \
-    --hash=sha256:0d0642fd2c7aa9882219e1f2faaf6c278f71f476df049941f0fb07423e3ad5d7 \
-    --hash=sha256:8bfc8604dd035c011b0f373b5d8ad8a1d0216663d2285e3c9a440e4ef0a6371b
+docling-slim==2.126.0 \
+    --hash=sha256:4853c1efec9b038b2593bb2d45f8fdc0f466219b069e83de6893ac7c285a413e \
+    --hash=sha256:f965e5d6289e444015f452f051e1562eb1da637002d66b350a5bc308d198524a
     # via
     #   -r /tmp/requirements.txt
     #   docling
@@ -2844,9 +2844,9 @@ pyparsing==3.3.2 \
     --hash=sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d \
     --hash=sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc
     # via matplotlib
-pypdf==6.16.2 \
-    --hash=sha256:595647f6191de6f402cfde1d0c455d6cbccbd509aac32b34783009c032de5d6e \
-    --hash=sha256:c8b09a59399062fb45a1b8156c18a787a10a3dae03ac9674397a226712c94604
+pypdf==6.17.0 \
+    --hash=sha256:097ad0d829778ec5b615aeaa5c6da4b6cac4992f8fd80b56f98a1a8c006573bb \
+    --hash=sha256:5bd827266a21553b74d910e350131a6227b72f2ab4209bf372814b8195fa11c5
     # via -r /tmp/requirements.txt
 pypdfium2==5.13.0 \
     --hash=sha256:07f58e91b8c45ca144a1ff3008faf3c73ef8a5e9fb32988831788363288228cd \
