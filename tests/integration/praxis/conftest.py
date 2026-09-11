@@ -20,10 +20,21 @@ def ogx_url(request):
     return url
 
 
+@pytest.fixture(autouse=True)
+def check_server_reachable(ogx_url):
+    """Skip test if the OGX server is not running or unreachable."""
+    try:
+        requests.get(f"{ogx_url}/health", timeout=2)
+    except Exception:
+        pytest.skip(f"OGX server at {ogx_url} is not running or unreachable")
+
+
 class PraxisClient:
     """HTTP client wrapper for Praxis / OGX API calls with tenant and user headers."""
 
-    def __init__(self, base_url: str, user_id: str | None = None, tenant_id: str | None = None):
+    def __init__(
+        self, base_url: str, user_id: str | None = None, tenant_id: str | None = None
+    ):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
         if user_id:

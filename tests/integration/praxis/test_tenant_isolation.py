@@ -6,8 +6,6 @@ Tests multi-tenant and cross-user isolation across OpenAI resource APIs:
 - Vector Store File Attachments (/v1/vector_stores/{vs_id}/files)
 """
 
-import pytest
-
 
 def test_files_cross_user_isolation(tenant_a_client, tenant_a_user_2_client):
     """User A creates a file via Praxis; User A2 in the same tenant cannot access or delete it."""
@@ -35,7 +33,9 @@ def test_files_cross_user_isolation(tenant_a_client, tenant_a_user_2_client):
 
         # 4. Owner (User A) can retrieve metadata
         owner_read_res = tenant_a_client.get(f"/files/{file_id}")
-        assert owner_read_res.status_code == 200, f"Owner failed to read file: {owner_read_res.text}"
+        assert owner_read_res.status_code == 200, (
+            f"Owner failed to read file: {owner_read_res.text}"
+        )
     finally:
         # Cleanup: Owner deletes file
         tenant_a_client.delete(f"/files/{file_id}")
@@ -58,7 +58,9 @@ def test_files_cross_tenant_isolation(tenant_a_client, tenant_b_client):
         if list_res.status_code == 200:
             files_data = list_res.json().get("data", [])
             file_ids = [f.get("id") for f in files_data]
-            assert file_id not in file_ids, f"File {file_id} leaked into Tenant B list response"
+            assert file_id not in file_ids, (
+                f"File {file_id} leaked into Tenant B list response"
+            )
 
         # 3. Tenant B attempts direct access
         read_res = tenant_b_client.get(f"/files/{file_id}")
@@ -80,7 +82,9 @@ def test_vector_stores_cross_user_isolation(tenant_a_client, tenant_a_user_2_cli
     """User A creates a vector store via Praxis; User A2 in same tenant cannot see or modify it."""
     # 1. User A creates vector store
     create_res = tenant_a_client.post("/vector_stores", json={"name": "user-a-store"})
-    assert create_res.status_code in (200, 201), f"Create vector store failed: {create_res.text}"
+    assert create_res.status_code in (200, 201), (
+        f"Create vector store failed: {create_res.text}"
+    )
     vs_id = create_res.json().get("id")
     assert vs_id is not None
 
@@ -90,7 +94,9 @@ def test_vector_stores_cross_user_isolation(tenant_a_client, tenant_a_user_2_cli
         if list_res.status_code == 200:
             stores = list_res.json().get("data", [])
             store_ids = [s.get("id") for s in stores]
-            assert vs_id not in store_ids, f"Vector store {vs_id} leaked to User A2 list"
+            assert vs_id not in store_ids, (
+                f"Vector store {vs_id} leaked to User A2 list"
+            )
 
         # 3. User A2 attempts direct retrieve
         read_res = tenant_a_user_2_client.get(f"/vector_stores/{vs_id}")
@@ -112,7 +118,9 @@ def test_vector_stores_cross_tenant_isolation(tenant_a_client, tenant_b_client):
     """Tenant A creates a vector store; Tenant B cannot view or attach files to it."""
     # 1. Tenant A creates vector store
     create_res = tenant_a_client.post("/vector_stores", json={"name": "tenant-a-store"})
-    assert create_res.status_code in (200, 201), f"Create vector store failed: {create_res.text}"
+    assert create_res.status_code in (200, 201), (
+        f"Create vector store failed: {create_res.text}"
+    )
     vs_id = create_res.json().get("id")
     assert vs_id is not None
 
@@ -130,7 +138,9 @@ def test_vector_stores_cross_tenant_isolation(tenant_a_client, tenant_b_client):
         if list_res.status_code == 200:
             stores = list_res.json().get("data", [])
             store_ids = [s.get("id") for s in stores]
-            assert vs_id not in store_ids, f"Vector store {vs_id} leaked to Tenant B list"
+            assert vs_id not in store_ids, (
+                f"Vector store {vs_id} leaked to Tenant B list"
+            )
 
         # 3. Tenant B attempts to attach their file to Tenant A's vector store
         attach_res = tenant_b_client.post(
@@ -171,14 +181,18 @@ def test_full_resource_attachment_lifecycle(tenant_a_client):
             f"/vector_stores/{vs_id}/files",
             json={"file_id": file_id},
         )
-        assert attach_res.status_code in (200, 201), f"Attach file failed: {attach_res.text}"
+        assert attach_res.status_code in (200, 201), (
+            f"Attach file failed: {attach_res.text}"
+        )
 
         # 4. List vector store files
         vs_files_res = tenant_a_client.get(f"/vector_stores/{vs_id}/files")
         assert vs_files_res.status_code == 200
         vs_files = vs_files_res.json().get("data", [])
         attached_ids = [f.get("id") for f in vs_files]
-        assert file_id in attached_ids, f"File {file_id} not found in vector store attachments"
+        assert file_id in attached_ids, (
+            f"File {file_id} not found in vector store attachments"
+        )
 
         # 5. Get file attachment details
         file_detail_res = tenant_a_client.get(f"/vector_stores/{vs_id}/files/{file_id}")
@@ -186,7 +200,9 @@ def test_full_resource_attachment_lifecycle(tenant_a_client):
 
         # 6. Detach file from vector store
         detach_res = tenant_a_client.delete(f"/vector_stores/{vs_id}/files/{file_id}")
-        assert detach_res.status_code in (200, 204), f"Detach file failed: {detach_res.text}"
+        assert detach_res.status_code in (200, 204), (
+            f"Detach file failed: {detach_res.text}"
+        )
     finally:
         # Cleanup
         tenant_a_client.delete(f"/vector_stores/{vs_id}")

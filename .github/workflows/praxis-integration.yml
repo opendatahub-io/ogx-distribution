@@ -33,4 +33,4 @@ jobs:
 
       - name: Run Praxis Tenant Isolation Integration Tests
         run: |
-          uv run pytest tests/integration/praxis/ -v
+          uv run --with pytest --with requests pytest tests/integration/praxis/ -v
