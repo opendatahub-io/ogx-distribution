@@ -1,0 +1,2 @@
+# Packages excluded from the Konflux lockfile because they require unavailable platform libraries.
+speechrecognition
