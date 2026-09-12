@@ -210,6 +210,7 @@ def _compile_lockfile(
     requirements_path: Path,
     output_path: Path,
     index_config: IndexConfig,
+    excludes: Path | None = None,
 ) -> None:
     """Run uv pip compile to produce a pinned lock file with hashes."""
     cmd = [
@@ -232,6 +233,8 @@ def _compile_lockfile(
         "-o",
         str(output_path),
     ]
+    if excludes:
+        cmd.extend(["--excludes", str(excludes)])
     if index_config.torch_backend:
         cmd.extend(["--torch-backend", index_config.torch_backend])
 
@@ -321,7 +324,14 @@ def main():
         print("  Compiling lock file...")
         tmp_path = _write_temp_requirements(requirements)
         try:
-            _compile_lockfile(tmp_path, target.output_path, target.index_config)
+            _compile_lockfile(
+                tmp_path,
+                target.output_path,
+                target.index_config,
+                excludes=Path("distribution/requirements-excludes-konflux.txt")
+                if name == LockfileType.DOWNSTREAM
+                else None,
+            )
         finally:
             os.unlink(tmp_path)
 
