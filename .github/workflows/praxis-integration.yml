@@ -1,0 +1,36 @@
+name: Praxis Tenant Isolation Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - rhoai-v*
+      - release-*
+    paths:
+      - '.github/workflows/praxis-integration.yml'
+      - 'tests/integration/praxis/**'
+  push:
+    branches:
+      - main
+      - rhoai-v*
+      - release-*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-praxis-tenant-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Praxis Tenant Isolation Integration Tests
+        run: |
+          uv run --with pytest --with requests pytest tests/integration/praxis/ -v
