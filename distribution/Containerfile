@@ -15,7 +15,6 @@ RUN uv pip install --prerelease=allow --upgrade \
     'setuptools==81.0.0' \
     'pillow>=12.3.0' \
     'nltk>=3.10.0' \
-    'langchain-community==0.4.1' \
     'mcp>=1.23.0,<2.0.0' \
     'tokenizers>=0.21,<0.23.0rc0'
 RUN uv pip install --prerelease=allow \
@@ -59,10 +58,6 @@ RUN uv pip install --prerelease=allow \
     uvicorn
 RUN uv pip install --prerelease=allow \
     llama_stack_provider_lmeval==0.4.2
-RUN uv pip install --prerelease=allow \
-    llama_stack_provider_ragas[inline]==0.5.4
-RUN uv pip install --prerelease=allow \
-    llama_stack_provider_ragas[remote]==0.5.4
 RUN uv pip install --prerelease=allow \
     llama_stack_provider_trustyai_fms==0.3.2
 RUN uv pip install --prerelease=allow \
