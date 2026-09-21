@@ -35,11 +35,6 @@ PINNED_DEPENDENCIES = [
     "'setuptools==81.0.0'",  # due to bug in milvus-lite with unreleased fix: https://github.com/milvus-io/milvus-lite/pull/323
     "'pillow>=12.3.0'",  # CVE-2026-42311, CVE-2026-55379/55380/54060
     "'nltk>=3.10.0'",  # CVE-2026-54293, CVE-2026-12243
-    # ragas 0.3.0 (pulled in by llama_stack_provider_ragas) imports
-    # langchain_community.chat_models.vertexai.ChatVertexAI at import time.
-    # That stub was removed in langchain-community 0.4.2; 0.4.1 is the last
-    # release that still ships it (and stays on the langchain-core 1.0.x line).
-    "'langchain-community==0.4.1'",
 ]
 
 source_install_command = """RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/llama-stack.git@{llama_stack_version}

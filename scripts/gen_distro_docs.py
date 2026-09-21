@@ -133,7 +133,7 @@ def gen_distro_table(providers_data):
     # Start with table header
     table_lines = [
         "| API | Provider | External? | Enabled by default? | How to enable |",
-        "|-----|----------|-----------|---------------------|---------------|",
+        "| ----- | ---------- | ----------- | --------------------- | --------------- |",
     ]
 
     # Load external provider information from config.yaml
