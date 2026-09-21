@@ -57,6 +57,7 @@ repos:
         files: ^distribution/.*$
         additional_dependencies:
           - uv>=0.9.0
+          - mcp>=1.23.0,<2.0.0
 
       - id: doc-gen
         name: Distribution Documentation

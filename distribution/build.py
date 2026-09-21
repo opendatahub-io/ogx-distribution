@@ -35,6 +35,8 @@ PINNED_DEPENDENCIES = [
     "'setuptools==81.0.0'",  # due to bug in milvus-lite with unreleased fix: https://github.com/milvus-io/milvus-lite/pull/323
     "'pillow>=12.3.0'",  # CVE-2026-42311, CVE-2026-55379/55380/54060
     "'nltk>=3.10.0'",  # CVE-2026-54293, CVE-2026-12243
+    "'mcp>=1.23.0,<2.0.0'",  # mcp 2.0 renamed McpError, breaks llama-stack 0.7.x
+    "'tokenizers>=0.21,<0.23.0rc0'",  # 0.23.0rc0 breaks granite-embedding model loading
 ]
 
 source_install_command = """RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/llama-stack.git@{llama_stack_version}
