@@ -37,7 +37,6 @@ PINNED_DEPENDENCIES = [
     "'pillow>=12.3.0'",  # CVE-2026-42311, CVE-2026-55379/55380/54060
     "'nltk>=3.10.0'",  # CVE-2026-54293, CVE-2026-12243
     "'mcp>=1.23.0,<2.0.0'",  # mcp 2.0 renamed McpError, breaks llama-stack 0.7.x
-    "'langchain-community==0.4.1'",  # 0.4.2 removed chat_models.vertexai, breaks ragas
 ]
 
 source_install_command_pypi_client = """RUN uv pip install --no-cache --no-deps git+https://github.com/opendatahub-io/llama-stack.git@{llama_stack_version}
