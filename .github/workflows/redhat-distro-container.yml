@@ -144,25 +144,27 @@ jobs:
 
       - name: Configure MaaS vLLM endpoints
         env:
-          _MAAS_VLLM_URL: ${{ secrets.MAAS_VLLM_URL }}
-          _MAAS_VLLM_API_TOKEN: ${{ secrets.MAAS_VLLM_API_TOKEN }}
-          _MAAS_EMBEDDING_URL: ${{ secrets.MAAS_EMBEDDING_URL }}
-          _MAAS_EMBEDDING_API_TOKEN: ${{ secrets.MAAS_EMBEDDING_API_TOKEN }}
+          _MAAS_URL: ${{ vars.LITEMAAS_URL }}
+          _MAAS_API_KEY: ${{ secrets.LITEMAAS_API_KEY }}
+          _MAAS_INFERENCE_MODEL: ${{ vars.LITEMAAS_INFERENCE_MODEL }}
+          _MAAS_EMBEDDING_MODEL: ${{ vars.LITEMAAS_EMBEDDING_MODEL }}
+          _IS_FORK: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.fork || github.secret_source == 'Dependabot') }}
         run: |
-          if [ -z "$_MAAS_VLLM_URL" ]; then
-            echo "MaaS vLLM URL not configured, skipping"
+          if [ "$_IS_FORK" = "true" ] || [ -z "$_MAAS_URL" ] || [ -z "$_MAAS_API_KEY" ] ||
+             [ -z "$_MAAS_INFERENCE_MODEL" ] || [ -z "$_MAAS_EMBEDDING_MODEL" ]; then
+            echo "LiteMaaS configuration unavailable; using local vLLM"
             exit 0
           fi
-          echo "Configuring MaaS vLLM endpoints for testing"
+          echo "Configuring LiteMaaS endpoints for testing"
           {
-            echo "VLLM_URL=$_MAAS_VLLM_URL"
-            echo "VLLM_API_TOKEN=$_MAAS_VLLM_API_TOKEN"
-            echo "VLLM_INFERENCE_MODEL=vllm-inference/llama-3-2-3b"
-            echo "VLLM_EMBEDDING_URL=$_MAAS_EMBEDDING_URL"
-            echo "VLLM_EMBEDDING_API_TOKEN=$_MAAS_EMBEDDING_API_TOKEN"
-            echo "EMBEDDING_MODEL=vllm-embedding/nomic-embed-text-v1-5"
+            echo "VLLM_URL=$_MAAS_URL"
+            echo "VLLM_API_TOKEN=$_MAAS_API_KEY"
+            echo "VLLM_INFERENCE_MODEL=vllm-inference/$_MAAS_INFERENCE_MODEL"
+            echo "VLLM_EMBEDDING_URL=$_MAAS_URL"
+            echo "VLLM_EMBEDDING_API_TOKEN=$_MAAS_API_KEY"
+            echo "EMBEDDING_MODEL=vllm-embedding/$_MAAS_EMBEDDING_MODEL"
             echo "EMBEDDING_PROVIDER=vllm-embedding"
-            echo "EMBEDDING_PROVIDER_MODEL_ID=nomic-embed-text-v1-5"
+            echo "EMBEDDING_PROVIDER_MODEL_ID=$_MAAS_EMBEDDING_MODEL"
             echo "USING_MAAS=true"
           } >> "$GITHUB_ENV"
 
