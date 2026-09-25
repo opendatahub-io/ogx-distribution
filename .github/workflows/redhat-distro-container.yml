@@ -214,6 +214,58 @@ jobs:
         shell: bash
         run: ./tests/run_integration_tests.sh
 
+      - name: Check MaaS DNS after failed PR #612 build
+        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.number == 612 && github.event.pull_request.head.repo.full_name == github.repository
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          dns_check=$(cat <<'PY'
+          import socket
+          import sys
+          from urllib.parse import urlsplit
+
+          hostname = urlsplit(sys.stdin.read().strip()).hostname
+          if not hostname:
+              sys.exit(1)
+          try:
+              socket.getaddrinfo(hostname, None)
+          except OSError:
+              sys.exit(1)
+          PY
+          )
+
+          if [ -z "${VLLM_URL:-}" ]; then
+            echo "MaaS vLLM URL is not configured"
+          else
+            if printf '%s' "$VLLM_URL" | python3 -c "$dns_check"; then
+              echo "Runner: MaaS hostname resolved"
+            else
+              echo "Runner: MaaS hostname did not resolve"
+            fi
+            if docker ps --format '{{.Names}}' | grep -qx llama-stack; then
+              if printf '%s' "$VLLM_URL" | docker exec -i llama-stack python3 -c "$dns_check"; then
+                echo "Container: MaaS hostname resolved"
+              else
+                echo "Container: MaaS hostname did not resolve"
+              fi
+            else
+              echo "Container: unavailable for DNS check"
+            fi
+          fi
+
+      - name: Install tmate for failed PR #612 build
+        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.number == 612 && github.event.pull_request.head.repo.full_name == github.repository
+        timeout-minutes: 5
+        run: sudo apt-get update && sudo apt-get install -y tmate
+
+      - name: Debug failed PR #612 build with tmate
+        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.number == 612 && github.event.pull_request.head.repo.full_name == github.repository
+        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3
+        timeout-minutes: 60
+        with:
+          install-dependencies: false
+          limit-access-to-actor: true
+
       - name: Gather logs and debugging information
         if: always()
         shell: bash
