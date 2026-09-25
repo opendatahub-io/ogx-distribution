@@ -214,6 +214,13 @@ jobs:
         shell: bash
         run: ./tests/run_integration_tests.sh
 
+      - name: Debug failed PR #612 build with tmate
+        if: failure() && github.event_name == 'pull_request' && github.event.pull_request.number == 612 && github.event.pull_request.head.repo.full_name == github.repository
+        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3
+        timeout-minutes: 60
+        with:
+          limit-access-to-actor: true
+
       - name: Gather logs and debugging information
         if: always()
         shell: bash
