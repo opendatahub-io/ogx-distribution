@@ -2,18 +2,9 @@ name: Build, test, and publish Red Hat Distribution Containers
 
 on:
   pull_request:
-    branches:
-      - main
-      - rhoai-v*
-      - konflux-poc*
     types:
       - opened
       - synchronize
-    paths:
-      - '.github/actions/**'
-      - '.github/workflows/redhat-distro-container.yml'
-      - 'distribution/**'
-      - 'tests/**'
   push:
     branches:
       - main
@@ -254,6 +245,13 @@ jobs:
           name: ci-logs-${{ matrix.arch }}-${{ github.sha }}
           path: logs/
           retention-days: 7
+
+      - name: Debug failed job with tmate
+        if: failure()
+        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3.24
+        timeout-minutes: 10
+        with:
+          limit-access-to-actor: true
 
       - name: Cleanup
         if: always()
