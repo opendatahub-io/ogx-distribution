@@ -112,10 +112,6 @@ attrs==26.1.0 \
     # via
     #   jsonschema
     #   referencing
-azure-ai-contentunderstanding==1.2.0b3 \
-    --hash=sha256:788390c8e852e0213d175d8b98514d7d3863e4e29f53a35c8a19d23a5a4a0a77 \
-    --hash=sha256:a2554333b39d68d523f6ad165215232026f605c9fb77eedb5e136b87187657a8
-    # via markitdown
 azure-ai-documentintelligence==1.0.2 \
     --hash=sha256:4d75a2513f2839365ebabc0e0e1772f5601b3a8c9a71e75da12440da13b63484 \
     --hash=sha256:e1fb446abbdeccc9759d897898a0fe13141ed29f9ad11fc705f951925822ed59
@@ -124,7 +120,6 @@ azure-core==1.41.0 \
     --hash=sha256:522b4011e8180b1a3dcd2024396a4e7fe9ac37fb8597db47163d230b5efe892d \
     --hash=sha256:f46ff5dfcd230f25cf1c19e8a34b8dc08a337b2503e268bb600a16c00db8ad5a
     # via
-    #   azure-ai-contentunderstanding
     #   azure-ai-documentintelligence
     #   azure-identity
 azure-identity==1.25.3 \
@@ -662,9 +657,9 @@ doclang==0.7.3 \
     --hash=sha256:9440c4ca9f7e061a7b8d33bdf15b1029be69a4c13cd8952dd6ce541884e4c685 \
     --hash=sha256:ca50615357e46ebf9597bb9065b9112367103ec24bd539f8ae12649224cf50b0
     # via docling-core
-docling==2.130.0 \
-    --hash=sha256:86f2052018a93c48810efecbd7a9ecb801dd407602c85c49a1006f252a7151ca \
-    --hash=sha256:f713849d7136511dff1079aeb7eed53bd68c20637c933a69728dbc8564340881
+docling==2.131.0 \
+    --hash=sha256:6a6b9e86780eba4db3b03796171f2f3cbdd569e4a3b5a75c8d74b40294523aee \
+    --hash=sha256:dc04d26869edef8cc02199fb45fbffedfff4308076d5059f2bb4a9e149f590a4
     # via -r /tmp/requirements.txt
 docling-core==2.99.0 \
     --hash=sha256:2ce0bae815de8139e8c0dc93736ba613609db777c3cbe392d9ec76bfabec6104 \
@@ -704,9 +699,9 @@ docling-parse==7.22.1 \
     --hash=sha256:e7eb7967db53f0b05aaf115b7aaf6e129a981cc2650378f424cc91c2b2180caa \
     --hash=sha256:eb8b5375341b688d4f4ae7dbe781e8c88634abcad290653919beee12a5f47150
     # via docling-slim
-docling-slim==2.130.0 \
-    --hash=sha256:913043ee069eb4f107d47ebfca8bdbfbfd7ec84160a7193b7260777e3adbea19 \
-    --hash=sha256:d45b467d322cd15f03fcc1e792bd4a52aa2dc075dfee229b13ae43a8603f82a6
+docling-slim==2.131.0 \
+    --hash=sha256:6e8a6e43773f39340aefb362fd23377f859bf6f9748ddf53f2bbae8e60b3aa75 \
+    --hash=sha256:a691267584f414c24d86106efd83f7b8212ace81aa5de78a0d1bc81e4a50c6cd
     # via
     #   -r /tmp/requirements.txt
     #   docling
@@ -1087,9 +1082,7 @@ idna==3.20 \
 isodate==0.7.2 \
     --hash=sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15 \
     --hash=sha256:4cd1aa0f43ca76f4a6c6c0292a85f40b35ec2e43e315b59f06e6d32171a953e6
-    # via
-    #   azure-ai-contentunderstanding
-    #   azure-ai-documentintelligence
+    # via azure-ai-documentintelligence
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
@@ -1603,9 +1596,9 @@ markdownify==1.2.3 \
     --hash=sha256:1a176f05522c8a2cb1dd3ab9d307dcdadbed5c26ae717855bfc42b3b6d38d937 \
     --hash=sha256:a189a0bedfd14009030fde5f85bb6f77c56897cb839b5c25315dd7d4e3e290ba
     # via markitdown
-markitdown==0.1.8 \
-    --hash=sha256:17188ad827ea79fc264c7b1ca8cf5a242a16278d84cc32f2edc475dbe92812ed \
-    --hash=sha256:de7375a50578a39bcbbf13b48c67d99033d988e0ae8ad25af46ed432dbe4cbab
+markitdown==0.1.5 \
+    --hash=sha256:4c956ff1528bf15e1814542035ec96e989206d19d311bb799f4df973ecafc31a \
+    --hash=sha256:5180a9a841e20fc01c2c09dbc5d039638429bbebcdc2af1b2615c3c427840434
     # via -r /tmp/requirements.txt
 marko==2.2.4 \
     --hash=sha256:c042c66f835425673123d7536b39b4660de3b68e30078c70fd26245b31170683 \
@@ -1914,9 +1907,9 @@ numpy==2.5.3 \
     #   shapely
     #   torchvision
     #   transformers
-ogx @ git+https://github.com/opendatahub-io/ogx.git@6e948a275501d9f95eceaf4fee1e86b14773081e
+ogx @ git+https://github.com/opendatahub-io/ogx.git@934dc5cd90b5ec2514da372f736d90080492c4e0
     # via -r /tmp/requirements.txt
-ogx-api @ git+https://github.com/opendatahub-io/ogx.git@6e948a275501d9f95eceaf4fee1e86b14773081e#subdirectory=src/ogx_api
+ogx-api @ git+https://github.com/opendatahub-io/ogx.git@934dc5cd90b5ec2514da372f736d90080492c4e0#subdirectory=src/ogx_api
     # via
     #   -r /tmp/requirements.txt
     #   ogx
@@ -4051,7 +4044,6 @@ typing-extensions==4.16.0 \
     # via
     #   anthropic
     #   anyio
-    #   azure-ai-contentunderstanding
     #   azure-ai-documentintelligence
     #   azure-core
     #   azure-identity
@@ -4343,9 +4335,9 @@ xlsxwriter==3.2.9 \
     --hash=sha256:254b1c37a368c444eac6e2f867405cc9e461b0ed97a3233b2ac1e574efb4140c \
     --hash=sha256:9a5db42bc5dff014806c58a20b9eae7322a134abb6fce3c92c181bfb275ec5b3
     # via python-pptx
-youtube-transcript-api==1.2.4 \
-    --hash=sha256:03878759356da5caf5edac77431780b91448fb3d8c21d4496015bdc8a7bc43ff \
-    --hash=sha256:b72d0e96a335df599d67cee51d49e143cff4f45b84bcafc202ff51291603ddcd
+youtube-transcript-api==1.0.3 \
+    --hash=sha256:902baf90e7840a42e1e148335e09fe5575dbff64c81414957aea7038e8a4db46 \
+    --hash=sha256:d1874e57de65cf14c9d7d09b2b37c814d6287fa0e770d4922c4cd32a5b3f6c47
     # via markitdown
 zstandard==0.25.0 \
     --hash=sha256:011d388c76b11a0c165374ce660ce2c8efa8e5d87f34996aa80f9c0816698b64 \
