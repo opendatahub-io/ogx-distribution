@@ -9,7 +9,9 @@
 # dependencies = ["pydantic-settings>=2,<3"]
 # ///
 
+import argparse
 import enum
+import json
 import os
 import re
 import shlex
@@ -24,6 +26,25 @@ from typing import NamedTuple
 from common import BuildConfig
 
 OGX_GIT_REPO = "https://github.com/opendatahub-io/ogx.git"
+NLTK_BUILD = Path(".nltk-build")
+
+
+def _build_nltk() -> None:
+    command = [
+        "uv",
+        "run",
+        "--no-project",
+        "--python",
+        sys.executable,
+        "distribution/nltk/build.py",
+        "--output-dir",
+        str(NLTK_BUILD),
+    ]
+    if source_repo := os.environ.get("NLTK_SOURCE_REPO"):
+        command.extend(["--source-repo", source_repo])
+    if os.environ.get("UV_OFFLINE") in ("1", "true"):
+        command.append("--offline")
+    _run(command)
 
 
 class OgxRequirements(NamedTuple):
@@ -133,6 +154,7 @@ def _build_venv(
             index_config.index_url,
             *packages,
         ]
+        cmd.extend(["--constraint", str(NLTK_BUILD / "constraints.txt")])
         if constraints:
             cmd.extend(["--constraint", str(constraints)])
         if index_config.torch_backend:
@@ -210,6 +232,8 @@ def _compile_lockfile(
     requirements_path: Path,
     output_path: Path,
     index_config: IndexConfig,
+    python_platform: str = "linux",
+    additional_constraints: Path | None = None,
 ) -> None:
     """Run uv pip compile to produce a pinned lock file with hashes."""
     cmd = [
@@ -218,8 +242,12 @@ def _compile_lockfile(
         "compile",
         "--constraint",
         str(Path("distribution/constraints.txt")),
+        "--constraint",
+        str(NLTK_BUILD / "constraints.txt"),
+        "--upgrade-package",
+        "nltk",
         "--python-platform",
-        "linux",
+        python_platform,
         "--python-version",
         "3.12",
         "--generate-hashes",
@@ -232,11 +260,22 @@ def _compile_lockfile(
         "-o",
         str(output_path),
     ]
+    if additional_constraints:
+        cmd.extend(["--constraint", str(additional_constraints)])
     if index_config.torch_backend:
         cmd.extend(["--torch-backend", index_config.torch_backend])
 
     output_path.unlink(missing_ok=True)
     _run(cmd)
+    manifest = json.loads((NLTK_BUILD / "manifest.json").read_text())
+    local_uri = (NLTK_BUILD / "wheels" / manifest["wheel"]).resolve().as_uri()
+    container_uri = (Path("/opt/app-root/nltk/wheels") / manifest["wheel"]).as_uri()
+    contents = output_path.read_text()
+    if local_uri not in contents:
+        raise ValueError(
+            "Failed to generate lock: fixed NLTK wheel reference is absent"
+        )
+    output_path.write_text(contents.replace(local_uri, container_uri))
 
     print(f"Successfully generated {output_path}")
 
@@ -253,7 +292,7 @@ def _build_requirements(
 
 def _write_temp_requirements(lines: list[str]) -> Path:
     """Write package lines to a temporary requirements file. Caller must clean up."""
-    path = Path(tempfile.gettempdir()) / "requirements.txt"
+    path = NLTK_BUILD / "requirements.in"
     path.write_text("\n".join(lines) + "\n")
     return path
 
@@ -285,6 +324,48 @@ def _get_lockfile_targets(
     return targets
 
 
+def _update_nltk_lock(target: LockfileConfig) -> None:
+    original = target.output_path.read_text()
+    block = re.compile(r"(?m)^nltk(?:==| @ )[^\n]*(?:\n[ \t]+[^\n]*)*")
+    old = block.search(original)
+    if old is None:
+        raise ValueError("Failed to update lock: existing NLTK entry is absent")
+    manifest = json.loads((NLTK_BUILD / "manifest.json").read_text())
+    wheel_uri = (NLTK_BUILD / "wheels" / manifest["wheel"]).resolve().as_uri()
+    replacement = f"nltk @ {wheel_uri} \\\n    --hash=sha256:{manifest['wheel_sha256']}"
+    requirements = NLTK_BUILD / (target.output_path.name + ".in")
+    requirements.write_text(replacement + "\n")
+    constraints = NLTK_BUILD / (target.output_path.name + ".constraints.txt")
+    constraints.write_text(block.sub("", original))
+    verified = NLTK_BUILD / target.output_path.name
+    _compile_lockfile(
+        requirements,
+        verified,
+        target.index_config,
+        "x86_64-manylinux_2_34",
+        constraints,
+    )
+    resolved = verified.read_text()
+    entries = re.compile(r"(?m)^(?!nltk(?:==| @ ))[A-Za-z0-9][^\n]*")
+    if not set(entries.findall(resolved)).issubset(entries.findall(original)):
+        raise ValueError(
+            "Failed to update lock: resolution changed packages other than NLTK"
+        )
+    new = block.search(resolved)
+    if new is None:
+        raise ValueError("Failed to update lock: resolved NLTK entry is absent")
+    annotations = "\n".join(
+        line for line in old.group().splitlines() if line.lstrip().startswith("#")
+    )
+    new_entry = "\n".join(
+        line for line in new.group().splitlines() if not line.lstrip().startswith("#")
+    )
+    target.output_path.write_text(
+        block.sub(lambda _: new_entry + "\n" + annotations, original)
+    )
+    print(f"Updated only NLTK in {target.output_path}")
+
+
 def main():
     if sys.platform != "linux":
         print(
@@ -293,7 +374,21 @@ def main():
         )
         sys.exit(1)
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--nltk-only",
+        action="store_true",
+        help="Resolve NLTK against the existing locked graph without moving other packages",
+    )
+    args = parser.parse_args()
     config = BuildConfig()
+    _build_nltk()
+    if args.nltk_only:
+        for target in _get_lockfile_targets(
+            config.ogx_install_from_source, config.rhai_index_url
+        ).values():
+            _update_nltk_lock(target)
+        return
     ogx_reqs = _get_ogx_requirements(config.ogx_version, config.ogx_install_from_source)
     targets = _get_lockfile_targets(
         config.ogx_install_from_source, config.rhai_index_url

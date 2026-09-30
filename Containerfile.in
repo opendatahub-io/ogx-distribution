@@ -3,6 +3,11 @@ FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
 ENV UV_TORCH_BACKEND=cpu \
     UV_CONFIG_FILE=/dev/null
 
+COPY distribution/nltk ${APP_ROOT}/nltk
+RUN uv run --no-project ${APP_ROOT}/nltk/build.py --output-dir ${APP_ROOT}/nltk
+ENV UV_CONSTRAINT=${APP_ROOT}/nltk/constraints.txt \
+    PIP_CONSTRAINT=${APP_ROOT}/nltk/constraints.txt
+
 COPY distribution/requirements-lock.txt ${APP_ROOT}/requirements-lock.txt
 # Package docling transitively pulls in opencv-python via rapidocr.
 # opencv-python requires libGL.so.1 (absent in UBI). Swap it for the headless

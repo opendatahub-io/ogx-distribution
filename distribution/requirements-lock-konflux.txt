@@ -416,8 +416,8 @@ narwhals==2.23.0 \
 networkx==3.6.1 \
     --hash=sha256:56b687ad58bed743066f1b7d5e6f56a72d2f193c8eaf35064abaedda4fba3745
     # via torch
-nltk==3.9.4 \
-    --hash=sha256:99935c670d486819ac6b9c78b2b36b811bdb8e0720414ee3f3663d8ff521bd62
+nltk @ file:///opt/app-root/nltk/wheels/nltk-3.10.3%2Brh.cve81726.4-py3-none-any.whl \
+    --hash=sha256:6910b6ce01872d75d354b0d4f19b3e3f2ecc8874a96b6be034b1f10987f19b43
     # via -r /tmp/requirements.txt
 numpy==2.5.1 \
     --hash=sha256:398208907bae47249bf42e9ec9777b0843f16ff00b184a787df82f6e9d34e2ff \

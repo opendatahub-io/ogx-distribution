@@ -1,0 +1,37 @@
+name: NLTK backport
+
+on:
+  pull_request:
+    paths:
+      - distribution/nltk/**
+      - .github/workflows/nltk-backport.yml
+      - Containerfile.in
+      - distribution/Containerfile.in
+      - build/gen_lockfile.py
+      - distribution/requirements-lock*.txt
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - name: Build pinned backport
+        run: |
+          wheel=$(uv run --no-project distribution/nltk/build.py --output-dir .nltk-build | tail -1)
+          echo "NLTK_WHEEL=$wheel" >> "$GITHUB_ENV"
+      - name: Check reproducible wheel
+        run: |
+          uv run --no-project distribution/nltk/build.py --output-dir .nltk-build-second
+          cmp .nltk-build/manifest.json .nltk-build-second/manifest.json
+      - name: Test installed package
+        run: >-
+          uv run --no-project --with "$NLTK_WHEEL" --with pytest --with pytest-socket --with 'numpy<3'
+          -m pytest distribution/nltk/test_cve.py --confcutdir=distribution/nltk -c /dev/null
+          --disable-socket --allow-unix-socket -q

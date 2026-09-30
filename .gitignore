@@ -23,6 +23,9 @@ venv/
 pytest-report.xml
 .coverage
 .python-version
+.nltk-build*/
+.lock-work/
+.integration-env/
 node_modules/
 tests/functional/reports/
 tests/functional/uv.lock
