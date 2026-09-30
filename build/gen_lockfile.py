@@ -11,7 +11,6 @@
 
 import enum
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -142,34 +141,28 @@ def _build_venv(
         yield venv_path
 
 
-def _resolve_env_defaults(text):
-    """Replace ${env.VAR:=default} and ${env.VAR:+value} templates.
+def _list_deps_env() -> dict[str, str]:
+    """Build the environment for `ogx stack list-deps`.
 
-    Pydantic validates build.yaml before env-var substitution, so
-    non-string fields (e.g. integers) must contain plain values.
-    Empty defaults are quoted to avoid YAML null interpretation.
+    `list-deps` substitutes `${env.VAR}` templates before validating build.yaml,
+    so the ambient environment would otherwise leak into the resolved config.
+    A minimal environment keeps lock file generation reproducible.
+
+    Fields typed as a plain `str` in StackConfig reject the `None` that an unset
+    `${env.VAR:=}` resolves to, so those get a placeholder — dependency
+    resolution only cares about the structural shape of the config, not values.
     """
-
-    def _replace_default(match):
-        default = match.group(1)
-        return f'"{default}"' if default == "" else default
-
-    text = re.sub(r"\$\{env\.[^:}]+:=([^}]*)\}", _replace_default, text)
-    text = re.sub(r"\$\{env\.[^:}]+:\+([^}]*)\}", r'"\1"', text)
-    return text
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}
+    env.update(POSTGRES_DB="placeholder", POSTGRES_USER="placeholder")
+    return env
 
 
 def _get_dependencies(ogx_bin: Path) -> list[str]:
     """Execute the ogx list-deps command and return a list of package specifiers."""
-    build_yaml = Path("build/build.yaml")
-    resolved = _resolve_env_defaults(build_yaml.read_text())
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
-        tmp.write(resolved)
-        tmp_path = tmp.name
-    try:
-        result = _run([str(ogx_bin), "stack", "list-deps", tmp_path])
-    finally:
-        os.unlink(tmp_path)
+    result = _run(
+        [str(ogx_bin), "stack", "list-deps", "build/build.yaml"],
+        env=_list_deps_env(),
+    )
 
     packages = []
     for line in result.stdout.splitlines():
