@@ -13,10 +13,8 @@ You can see an overview of the APIs and Providers the image ships with in the ta
 | batches | inline::reference | No | ✅ | N/A |
 | datasetio | inline::localfs | No | ✅ | N/A |
 | datasetio | remote::huggingface | No | ✅ | N/A |
-| eval | inline::trustyai_ragas | Yes (version 0.6.1) | ❌ | Set the `TRUSTYAI_EMBEDDING_MODEL` environment variable |
 | eval | remote::trustyai_garak | Yes (version 0.3.1) | ❌ | Set the `ENABLE_KUBEFLOW_GARAK` environment variable |
 | eval | remote::trustyai_lmeval | Yes (version 0.5.0) | ✅ | N/A |
-| eval | remote::trustyai_ragas | Yes (version 0.6.1) | ❌ | Set the `ENABLE_KUBEFLOW_RAGAS` environment variable |
 | files | inline::localfs | No | ✅ | N/A |
 | files | remote::s3 | No | ❌ | Set the `ENABLE_S3` environment variable |
 | inference | inline::sentence-transformers | No | ❌ | Set the `ENABLE_SENTENCE_TRANSFORMERS` environment variable |
