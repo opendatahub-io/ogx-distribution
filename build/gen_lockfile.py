@@ -23,7 +23,7 @@ from typing import NamedTuple
 
 from common import BuildConfig
 
-OGX_GIT_REPO = "https://github.com/opendatahub-io/ogx.git"
+OGX_GIT_REPO = "https://github.com/Artemon-line/ogx.git"
 
 
 class OgxRequirements(NamedTuple):
