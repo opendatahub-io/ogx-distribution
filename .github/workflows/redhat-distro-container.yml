@@ -288,7 +288,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_BEDROCK_ROLE_ARN }}
           aws-region: ${{ vars.AWS_BEDROCK_REGION || 'us-east-2' }}
-          role-duration-seconds: 12000
+          role-duration-seconds: 4600
       - name: Authenticate to Azure (OIDC)
         if: env.AZURE_CLIENT_ID != '' && github.event_name != 'workflow_dispatch' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && github.secret_source != 'Dependabot'))
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
