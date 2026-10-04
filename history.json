@@ -561,5 +561,78 @@
         "error": 206
       }
     ]
+  },
+  {
+    "date": "2026-10-04 22:09 UTC",
+    "run_number": "53",
+    "run_id": "37238495975",
+    "run_url": "https://github.com/opendatahub-io/ogx-distribution/actions/runs/37238495975",
+    "ogx_version": "v1.4.0+rhaiv.1",
+    "branch": "main",
+    "commit": "7643141d",
+    "totals": {
+      "passed": 227,
+      "failed": 88,
+      "skipped": 129,
+      "error": 1236
+    },
+    "models": [
+      {
+        "provider": "azure",
+        "model": "gpt-4o",
+        "passed": 25,
+        "failed": 28,
+        "skipped": 20,
+        "error": 206
+      },
+      {
+        "provider": "bedrock",
+        "model": "openai.gpt-oss-20b-1-0",
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "error": 0
+      },
+      {
+        "provider": "openai",
+        "model": "gpt-4.1-nano",
+        "passed": 49,
+        "failed": 1,
+        "skipped": 23,
+        "error": 206
+      },
+      {
+        "provider": "openai",
+        "model": "gpt-4.1",
+        "passed": 49,
+        "failed": 1,
+        "skipped": 23,
+        "error": 206
+      },
+      {
+        "provider": "vertexai",
+        "model": "gemini-2.0-flash",
+        "passed": 25,
+        "failed": 28,
+        "skipped": 20,
+        "error": 206
+      },
+      {
+        "provider": "vertexai",
+        "model": "gemini-2.5-pro",
+        "passed": 48,
+        "failed": 2,
+        "skipped": 23,
+        "error": 206
+      },
+      {
+        "provider": "vllm-maas",
+        "model": "Qwen3-0.6B",
+        "passed": 25,
+        "failed": 28,
+        "skipped": 20,
+        "error": 206
+      }
+    ]
   }
 ]
