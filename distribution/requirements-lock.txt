@@ -1927,9 +1927,9 @@ numpy==2.5.3 \
     #   shapely
     #   torchvision
     #   transformers
-ogx @ git+https://github.com/opendatahub-io/ogx.git@934dc5cd90b5ec2514da372f736d90080492c4e0
+ogx @ git+https://github.com/Artemon-line/ogx.git@142b0bf57cf54819c12379e73ec99459eff88107
     # via -r /tmp/requirements.txt
-ogx-api @ git+https://github.com/opendatahub-io/ogx.git@934dc5cd90b5ec2514da372f736d90080492c4e0#subdirectory=src/ogx_api
+ogx-api @ git+https://github.com/Artemon-line/ogx.git@142b0bf57cf54819c12379e73ec99459eff88107#subdirectory=src/ogx_api
     # via
     #   -r /tmp/requirements.txt
     #   ogx
