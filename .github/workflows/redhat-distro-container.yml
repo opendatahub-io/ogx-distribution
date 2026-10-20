@@ -35,7 +35,7 @@ on:
         required: true
         type: string
 
-  # do a nightly test of the `main` branch of ogx at 6AM UTC every morning
+  # do a nightly test of the `release-1.4.x` branch of ogx at 6AM UTC every morning
   schedule:
     - cron: '0 6 * * *'
 
@@ -87,7 +87,7 @@ jobs:
       EMBEDDING_MODEL: vllm-embedding/ibm-granite/granite-embedding-125m-english
       VLLM_URL: http://localhost:8000/v1
       VLLM_EMBEDDING_URL: http://localhost:8001/v1
-      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
+      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'release-1.4.x' }}
       # Fork/Dependabot PRs can't reach the stage registry, so they build from
       # the cache (populated by non-fork runs); everyone else pulls the modelcar.
       IS_FORK: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.fork || github.secret_source == 'Dependabot') }}
@@ -435,7 +435,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && needs.build-test.outputs.distribution-changed == 'true')
     runs-on: ubuntu-latest
     env:
-      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'main' }}
+      OGX_COMMIT_SHA: ${{ github.event.inputs.ogx_commit_sha || 'release-1.4.x' }}
     permissions:
       contents: read
       id-token: write # for cosign keyless signing
