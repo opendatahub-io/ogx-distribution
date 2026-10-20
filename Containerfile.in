@@ -31,7 +31,6 @@ FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
 ARG OGX_ARTIFACT_SOURCE
 
 COPY distribution/requirements-lock.txt ${APP_ROOT}/requirements-lock.txt
-# RapidOCR installs the headless OpenCV build, which avoids UBI's missing libGL.so.1.
 RUN uv pip sync --verify-hashes ${APP_ROOT}/requirements-lock.txt
 
 # Model/data artifacts from the selected modelcar stage. Files are stored
