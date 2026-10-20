@@ -33,14 +33,7 @@ FROM quay.io/opendatahub/odh-midstream-python-base-3-12@sha256:2114201120ac46a4b
 ARG OGX_ARTIFACT_SOURCE
 
 COPY distribution/requirements-lock.txt ${APP_ROOT}/requirements-lock.txt
-# Package docling transitively pulls in opencv-python via rapidocr.
-# opencv-python requires libGL.so.1 (absent in UBI). Swap it for the headless
-# variant after install, pinned to the exact version the resolver chose.
-RUN uv pip sync --verify-hashes ${APP_ROOT}/requirements-lock.txt \
-    && OPENCV_VERSION=$(uv pip show opencv-python 2>/dev/null | awk '/^Version:/{print $2}') \
-    && [ -n "${OPENCV_VERSION}" ] || { echo "ERROR: opencv-python not found after install"; exit 1; } \
-    && uv pip uninstall opencv-python \
-    && uv pip install "opencv-python-headless==${OPENCV_VERSION}"
+RUN uv pip sync --verify-hashes ${APP_ROOT}/requirements-lock.txt
 
 # Model/data artifacts from the selected modelcar stage. Files are stored
 # .cache-relative under /models, so their contents land under ${APP_ROOT}/.cache
