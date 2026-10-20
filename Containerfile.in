@@ -25,7 +25,7 @@ COPY distribution/artifact-cache/models /models
 # Select the source stage; both expose the model/data files at /models.
 FROM modelcar-${OGX_ARTIFACT_SOURCE} AS modelcar
 
-FROM quay.io/opendatahub/odh-midstream-python-base-3-12:latest
+FROM quay.io/opendatahub/odh-midstream-python-base-3-12@sha256:2114201120ac46a4b790568bb3511bc5a2df228930f91381369f3fc26dc4bc65
 
 # Re-declared for use in the RUN below (global ARGs are not inherited by stages).
 ARG OGX_ARTIFACT_SOURCE
