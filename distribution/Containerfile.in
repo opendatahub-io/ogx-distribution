@@ -3,7 +3,7 @@ WORKDIR /opt/app-root
 
 RUN pip install sqlalchemy # somehow sqlalchemy[asyncio] is not sufficient
 {dependencies}
-RUN pip install 'aiohttp==3.13.3' 'fonttools==4.60.2' 'pypdf==6.1.3' 'tornado==6.5.3' 'urllib3==2.6.0'
+RUN pip install 'aiohttp==3.14.5' 'fonttools==4.60.2' 'litellm==1.103.1' 'pypdf==6.1.3' 'tornado==6.5.3' 'urllib3==2.6.0'
 RUN pip install --no-cache llama-stack==0.2.22
 RUN mkdir -p ${{HOME}}/.llama ${{HOME}}/.cache
 COPY distribution/run.yaml ${{APP_ROOT}}/run.yaml
