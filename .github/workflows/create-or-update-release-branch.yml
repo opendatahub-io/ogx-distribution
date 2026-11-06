@@ -28,7 +28,7 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.event.client_payload.tag }}
       BRANCH: release-${{ inputs.product_version || github.event.client_payload.product_version }}
-      UPDATE_BRANCH: automated/update-release-${{ inputs.product_version || github.event.client_payload.product_version }}
+      UPDATE_BRANCH: automated/update-release-${{ inputs.product_version || github.event.client_payload.product_version }}-${{ inputs.tag || github.event.client_payload.tag }}
       WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       SLACK_WEBHOOK_URL: ${{ secrets.WH_SLACK_TEAM_LLS_CORE }}
       SLACK_GROUP: S0AHXK52HGD
