@@ -131,7 +131,7 @@ function test_model_openai_inference {
   validate_model_parameter "$1"
   local model="$1"
   echo "===> Attempting to chat with model $model..."
-  resp=$(curl -fsS $OGX_BASE_URL/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\": \"$model\",\"messages\": [{\"role\": \"user\", \"content\": \"What color is grass?\"}], \"max_tokens\": 128, \"temperature\": 0.0}")
+  resp=$(curl -fsS $OGX_BASE_URL/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\": \"$model\",\"messages\": [{\"role\": \"user\", \"content\": \"What color is grass?\"}], \"max_tokens\": 512, \"temperature\": 0.0}")
   if echo "$resp" | grep -q "green"; then
     echo "===> Inference is working :)"
     return 0
